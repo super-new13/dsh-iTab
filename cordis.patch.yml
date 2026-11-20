@@ -1,0 +1,18 @@
+# dsh-itab bundle patch.
+#
+# Manual mount equivalent (profile cordis.patch.yml):
+#
+#   - insert:
+#       - id: itab
+#         name: 'dsh-itab'
+#
+# Only the Node half loads through this row; the web client half is served
+# through the package's exports["./client"] entry and mounted by the browser
+# boot graph (window.__DSH_BOOT__).
+#
+# `name` is the module specifier the profile resolves through Node module
+# resolution from the profile directory, so it must equal package.json `name`
+# exactly. Quoted for symmetry with scoped bundles.
+- insert:
+    - id: itab
+      name: 'dsh-itab'
