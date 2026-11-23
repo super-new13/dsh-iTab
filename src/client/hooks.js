@@ -32,7 +32,7 @@ function useTabsSurface(enabled) {
  *
  * Reconciles on every sessions-store change: archived sessions drop,
  * blank (newly created) sessions gain their chip, and a navigation is
- * a replace (default) or an open (browser mode) per prefs. Writes only
+ * an open (default) or a replace (opt-in) per prefs. Writes only
  * when the list actually changed, so an idle store costs no renders. */
 // Module scope on purpose: the shell remounts the conversation header (and
 // this strip with it) on every navigation, which wipes any useRef. Keeping
@@ -45,7 +45,9 @@ function useTabSync(sessions, useWorkspaces, prefs) {
   const React = P.React
   const workspaces = typeof useWorkspaces === 'function' ? useWorkspaces((s) => s) : null
   const archivedIds = (workspaces && workspaces.archivedSessionIds) || []
-  const sidebarOpen = prefs.sidebarOpen === 'open' ? 'open' : 'replace'
+  // 'replace' must be chosen explicitly; anything else (including a key
+  // missing from an older snapshot) keeps the browser-like open default.
+  const sidebarOpen = prefs.sidebarOpen === 'replace' ? 'replace' : 'open'
   const cap = capFromPrefs(prefs)
   React.useEffect(() => {
     const byId = sessions && sessions.byId ? sessions.byId : null

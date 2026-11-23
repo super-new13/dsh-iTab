@@ -183,7 +183,7 @@ function reconcileTabs(tabs, currentId, previousId, options = {}) {
   const previous = tabIdOf(previousId)
   const isBlank = options.isBlank ?? (() => false)
   const isArchived = options.isArchived ?? (() => false)
-  const sidebarOpen = options.sidebarOpen ?? 'replace'
+  const sidebarOpen = options.sidebarOpen ?? 'open'
   let kept = normalizeTabs(tabs, Number.MAX_SAFE_INTEGER).filter((id) => !isArchived(id))
   if (!current) return kept.slice(0, cap)
   if (kept.includes(current)) return kept.slice(0, cap)
@@ -465,6 +465,7 @@ const en = {
  */
 function createViewStore() {
   if (!P.storeKit || typeof P.storeKit.defineStore !== 'function') return null
+  migrateViewStore()
   return P.storeKit.defineStore({
     init: () => ({
       prefs: {
@@ -473,10 +474,10 @@ function createViewStore() {
         maxTabs: 20,
         statusDots: true,
         middleClickClose: true,
-        sidebarOpen: 'replace',
+        sidebarOpen: 'open',
       },
     }),
-    persist: 'dsh.itab.view.v1',
+    persist: 'dsh.itab.view.v2',
     actions: {
       setPref(d, key, value) {
         if (!d.prefs) d.prefs = {}
@@ -484,6 +485,32 @@ function createViewStore() {
       },
     },
   })
+}
+
+/* v1 → v2: the sidebar-open default changed from 'replace' to 'open' —
+ * replacing the on-screen tab read as a bug (a running session's tab,
+ * status dot included, vanished when any sidebar row was clicked).
+ * Hydration is WHOLESALE, so the new default never reaches a stored v1
+ * snapshot: copy the prefs forward WITHOUT sidebarOpen (it re-defaults
+ * to 'open'), then drop v1. Idempotent, and a no-op where v2 already
+ * exists or localStorage is unavailable. */
+function migrateViewStore() {
+  const LEGACY_KEY = 'dsh.itab.view.v1'
+  const KEY = 'dsh.itab.view.v2'
+  if (typeof localStorage === 'undefined') return
+  try {
+    const legacy = localStorage.getItem(LEGACY_KEY)
+    if (legacy === null) return
+    if (localStorage.getItem(KEY) === null) {
+      const parsed = JSON.parse(legacy)
+      const prefs = parsed && parsed.prefs ? { ...parsed.prefs } : {}
+      delete prefs.sidebarOpen
+      localStorage.setItem(KEY, JSON.stringify({ prefs }))
+    }
+    localStorage.removeItem(LEGACY_KEY)
+  } catch {
+    /* corrupt legacy payload — leave it; the store starts from defaults */
+  }
 }
 
 /** Effective tab cap from prefs (bounded to the known choice set). */
@@ -635,7 +662,9 @@ function sessionTitleOf(summary, t) {
   return String(summary.displayTitle || summary.title || '')
 }
 
-/** Status classification shared by chips and menus. */
+/** Status classification shared by chips and menus. `subagents` is the
+ *  count of running child sessions (shell sidebar parity: a parent whose
+ *  subagents are still running shows ongoing even when it is idle). */
 function sessionStateOf(row, current) {
   if (!row) return null
   if (row.pending === 'approval' || row.pending === 'plan-review' || row.pending === 'question') return 'warning'
@@ -1298,7 +1327,7 @@ function useTabsSurface(enabled) {
  *
  * Reconciles on every sessions-store change: archived sessions drop,
  * blank (newly created) sessions gain their chip, and a navigation is
- * a replace (default) or an open (browser mode) per prefs. Writes only
+ * an open (default) or a replace (opt-in) per prefs. Writes only
  * when the list actually changed, so an idle store costs no renders. */
 // Module scope on purpose: the shell remounts the conversation header (and
 // this strip with it) on every navigation, which wipes any useRef. Keeping
@@ -1311,7 +1340,9 @@ function useTabSync(sessions, useWorkspaces, prefs) {
   const React = P.React
   const workspaces = typeof useWorkspaces === 'function' ? useWorkspaces((s) => s) : null
   const archivedIds = (workspaces && workspaces.archivedSessionIds) || []
-  const sidebarOpen = prefs.sidebarOpen === 'open' ? 'open' : 'replace'
+  // 'replace' must be chosen explicitly; anything else (including a key
+  // missing from an older snapshot) keeps the browser-like open default.
+  const sidebarOpen = prefs.sidebarOpen === 'replace' ? 'replace' : 'open'
   const cap = capFromPrefs(prefs)
   React.useEffect(() => {
     const byId = sessions && sessions.byId ? sessions.byId : null
@@ -2093,13 +2124,43 @@ function TabsStrip(props) {
     // opening instead.
     onShow: () => { if (chipTipState.current.cwd) branchCache.ensure([chipTipState.current.cwd]) },
   })
+  // Shell parity (sidebar sessionNode): a status entry exists for EVERY
+  // listed session, but its `running` stays undefined until the host
+  // observes that session — an entry with undefined must fall through to
+  // the list row's own flag, exactly like the sidebar's
+  // `status?.running ?? s.running`. Treating the entry as authoritative
+  // turned never-observed rows (fresh load, cross-host listings) into
+  // "not running" and their dots never showed.
+  const runningOf = (id) => {
+    const entry = statuses && typeof statuses.get === 'function' ? statuses.get(id) : undefined
+    if (entry && entry.running !== undefined) return entry.running === true
+    const row = sessions && sessions.byId ? sessions.byId[id] : undefined
+    return !!(row && row.running)
+  }
+  // A parent session whose SUBAGENTS are still running shows ongoing in
+  // the sidebar (running-subagent count over the session catalog); the
+  // chips owe the same answer. Catalog shape mirrors the shell:
+  // sessions.projectionsBySession[parent].values.subagentCatalog.
+  const runningSubagentsOf = (id) => {
+    const projections = sessions && sessions.projectionsBySession ? sessions.projectionsBySession : null
+    const catalog = projections && projections[id] && projections[id].values
+      ? projections[id].values.subagentCatalog : null
+    if (!Array.isArray(catalog)) return 0
+    let count = 0
+    for (const child of catalog) {
+      if (!child || child.id === undefined || child.id === null) continue
+      if (runningOf(String(child.id))) count += 1
+    }
+    return count
+  }
   const stateOf = (id) => {
     const status = statuses && typeof statuses.get === 'function' ? statuses.get(id) : undefined
     const summary = sessions && sessions.byId ? sessions.byId[id] : undefined
     return sessionStateOf({
-      running: status ? status.running === true : !!(summary && summary.running),
+      running: runningOf(id),
       completed: status ? status.completionUnread === true : !!(summary && summary.completed),
       pending: status && status.pendingInteraction ? status.pendingInteraction.kind : undefined,
+      subagents: runningSubagentsOf(id),
     }, sessionId === id)
   }
 
@@ -2391,7 +2452,9 @@ function ItabBundleConfig(props) {
   const cap = capFromPrefs(prefs)
   const statusDots = prefs.statusDots !== false
   const middleClickClose = prefs.middleClickClose !== false
-  const sidebarOpen = prefs.sidebarOpen === 'open' ? 'open' : 'replace'
+  // 'replace' must be chosen explicitly; anything else (including a key
+  // missing from an older snapshot) keeps the browser-like open default.
+  const sidebarOpen = prefs.sidebarOpen === 'replace' ? 'replace' : 'open'
 
   const switchRow = (key, label, hint, value) =>
     E('div', { className: 'itab-cfg-row', key: key },
@@ -2434,7 +2497,7 @@ function ItabBundleConfig(props) {
     switchRow('statusDots', t('config.statusDots'), t('config.statusDotsHint'), statusDots),
     switchRow('statusPulse', t('config.statusPulse'), t('config.statusPulseHint'), prefs.statusPulse === true),
     switchRow('middleClickClose', t('config.middleClickClose'), null, middleClickClose),
-    segRow('sidebarOpen', t('config.sidebarOpen'), null, ['replace', 'open'], sidebarOpen, (v) => t('config.sidebarOpen.' + v)),
+    segRow('sidebarOpen', t('config.sidebarOpen'), null, ['open', 'replace'], sidebarOpen, (v) => t('config.sidebarOpen.' + v)),
   )
 }
 

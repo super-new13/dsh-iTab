@@ -9,6 +9,7 @@
  */
 function createViewStore() {
   if (!P.storeKit || typeof P.storeKit.defineStore !== 'function') return null
+  migrateViewStore()
   return P.storeKit.defineStore({
     init: () => ({
       prefs: {
@@ -17,10 +18,10 @@ function createViewStore() {
         maxTabs: 20,
         statusDots: true,
         middleClickClose: true,
-        sidebarOpen: 'replace',
+        sidebarOpen: 'open',
       },
     }),
-    persist: 'dsh.itab.view.v1',
+    persist: 'dsh.itab.view.v2',
     actions: {
       setPref(d, key, value) {
         if (!d.prefs) d.prefs = {}
@@ -28,6 +29,32 @@ function createViewStore() {
       },
     },
   })
+}
+
+/* v1 → v2: the sidebar-open default changed from 'replace' to 'open' —
+ * replacing the on-screen tab read as a bug (a running session's tab,
+ * status dot included, vanished when any sidebar row was clicked).
+ * Hydration is WHOLESALE, so the new default never reaches a stored v1
+ * snapshot: copy the prefs forward WITHOUT sidebarOpen (it re-defaults
+ * to 'open'), then drop v1. Idempotent, and a no-op where v2 already
+ * exists or localStorage is unavailable. */
+export function migrateViewStore() {
+  const LEGACY_KEY = 'dsh.itab.view.v1'
+  const KEY = 'dsh.itab.view.v2'
+  if (typeof localStorage === 'undefined') return
+  try {
+    const legacy = localStorage.getItem(LEGACY_KEY)
+    if (legacy === null) return
+    if (localStorage.getItem(KEY) === null) {
+      const parsed = JSON.parse(legacy)
+      const prefs = parsed && parsed.prefs ? { ...parsed.prefs } : {}
+      delete prefs.sidebarOpen
+      localStorage.setItem(KEY, JSON.stringify({ prefs }))
+    }
+    localStorage.removeItem(LEGACY_KEY)
+  } catch {
+    /* corrupt legacy payload — leave it; the store starts from defaults */
+  }
 }
 
 /** Effective tab cap from prefs (bounded to the known choice set). */

@@ -153,7 +153,7 @@ export function reconcileTabs(tabs, currentId, previousId, options = {}) {
   const previous = tabIdOf(previousId)
   const isBlank = options.isBlank ?? (() => false)
   const isArchived = options.isArchived ?? (() => false)
-  const sidebarOpen = options.sidebarOpen ?? 'replace'
+  const sidebarOpen = options.sidebarOpen ?? 'open'
   let kept = normalizeTabs(tabs, Number.MAX_SAFE_INTEGER).filter((id) => !isArchived(id))
   if (!current) return kept.slice(0, cap)
   if (kept.includes(current)) return kept.slice(0, cap)

@@ -118,12 +118,12 @@ test('tabsForClick XOR of preference and shift', () => {
   assert.deepEqual(tabsForClick([], '', 'x', { shift: true }), { tabs: ['x'], opened: true })
 })
 
-test('reconcileTabs replaces current tab by default (sidebar replace mode)', () => {
-  assert.deepEqual(reconcileTabs(T, 'x', 'c'), ['a', 'b', 'x', 'd', 'e'])
+test('reconcileTabs opens a new tab by default (browser-like)', () => {
+  assert.deepEqual(reconcileTabs(T, 'x', 'c'), ['a', 'b', 'c', 'd', 'e', 'x'])
 })
 
-test('reconcileTabs opens instead when sidebarOpen=open', () => {
-  assert.deepEqual(reconcileTabs(T, 'x', 'c', { sidebarOpen: 'open' }), ['a', 'b', 'c', 'd', 'e', 'x'])
+test('reconcileTabs replaces the current tab only when sidebarOpen=replace (opt-in)', () => {
+  assert.deepEqual(reconcileTabs(T, 'x', 'c', { sidebarOpen: 'replace' }), ['a', 'b', 'x', 'd', 'e'])
 })
 
 test('reconcileTabs keeps blank tabs open', () => {
@@ -137,8 +137,8 @@ test('reconcileTabs keeps blank tabs open', () => {
 test('reconcileTabs drops archived and never strands the on-screen session', () => {
   const archived = (id) => id === 'b'
   assert.deepEqual(reconcileTabs(T, 'a', 'c', { isArchived: archived }), ['a', 'c', 'd', 'e'])
-  // previous closed → current still gets a tab
-  assert.deepEqual(reconcileTabs(['a', 'b'], 'z', 'b'), ['a', 'z'])
+  // previous closed → current still gets a tab (open mode appends)
+  assert.deepEqual(reconcileTabs(['a', 'b'], 'z', 'b'), ['a', 'b', 'z'])
 })
 
 test('reconcileTabs never resurrects a deliberately closed current tab (no navigation)', () => {

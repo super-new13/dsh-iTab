@@ -3,6 +3,77 @@ import assert from 'node:assert/strict'
 
 import { TIP_EDGE, pointInRect, placeTip } from '../src/client/tooltip.js'
 import { normalizeGitBranch, createBranchCache, GitBranchRouteUnavailable, openWorkspacePathEnvelope, revealProjectFolder, openProjectInVscode } from '../src/client/gitbranch.js'
+import { sessionStateOf } from '../src/client/helpers.js'
+import { migrateViewStore } from '../src/client/store.js'
+
+/* --------------------------- status classification --------------------------- */
+
+test('sessionStateOf: pending wins, subagent running shows ongoing (sidebar parity)', () => {
+  assert.equal(sessionStateOf({ pending: 'approval' }), 'warning')
+  assert.equal(sessionStateOf({ pending: 'plan-review' }), 'warning')
+  assert.equal(sessionStateOf({ pending: 'question' }), 'warning')
+  // pending outranks running
+  assert.equal(sessionStateOf({ pending: 'question', running: true }), 'warning')
+  assert.equal(sessionStateOf({ running: true }), 'ongoing')
+  // a parent whose subagents are still running shows ongoing even when idle
+  assert.equal(sessionStateOf({ running: false, subagents: 2 }), 'ongoing')
+  assert.equal(sessionStateOf({ subagents: 1, completed: true }), 'ongoing')
+  // done only for non-current sessions with an unread completion
+  assert.equal(sessionStateOf({ completed: true }), 'done')
+  assert.equal(sessionStateOf({ completed: true }, true), null)
+  assert.equal(sessionStateOf({}), null)
+  assert.equal(sessionStateOf(null), null)
+})
+
+/* ------------------------------ store migration ------------------------------ */
+
+test('migrateViewStore: v1→v2 re-defaults sidebarOpen and keeps other prefs', () => {
+  const backing = new Map([['dsh.itab.view.v1', JSON.stringify({ prefs: { maxWidth: 300, statusPulse: true, sidebarOpen: 'replace' } })]])
+  globalThis.localStorage = {
+    getItem: (k) => (backing.has(k) ? backing.get(k) : null),
+    setItem: (k, v) => backing.set(k, String(v)),
+    removeItem: (k) => backing.delete(k),
+  }
+  try {
+    migrateViewStore()
+    assert.equal(backing.has('dsh.itab.view.v1'), false, 'legacy key removed')
+    const v2 = JSON.parse(backing.get('dsh.itab.view.v2'))
+    assert.equal(v2.prefs.maxWidth, 300, 'unrelated prefs carried over')
+    assert.equal(v2.prefs.statusPulse, true, 'unrelated prefs carried over')
+    assert.equal('sidebarOpen' in v2.prefs, false, 'sidebarOpen re-defaults')
+    // idempotent: a second run is a no-op (no v1 present)
+    migrateViewStore()
+    assert.equal(JSON.parse(backing.get('dsh.itab.view.v2')).prefs.maxWidth, 300)
+  } finally {
+    delete globalThis.localStorage
+  }
+})
+
+test('migrateViewStore: corrupt v1 payload (no v2 yet) is left alone', () => {
+  const backing = new Map([
+    ['dsh.itab.view.v1', 'not json{{{'],
+    ['dsh.itab.view.v2', JSON.stringify({ prefs: { sidebarOpen: 'replace' } })],
+  ])
+  globalThis.localStorage = {
+    getItem: (k) => (backing.has(k) ? backing.get(k) : null),
+    setItem: (k, v) => backing.set(k, String(v)),
+    removeItem: (k) => backing.delete(k),
+  }
+  try {
+    // v2 already present: the stale v1 is dropped without parsing it
+    migrateViewStore()
+    assert.equal(backing.has('dsh.itab.view.v1'), false, 'stale v1 dropped when v2 exists')
+    assert.equal(JSON.parse(backing.get('dsh.itab.view.v2')).prefs.sidebarOpen, 'replace', 'explicit v2 kept')
+    // corrupt v1 with NO v2: the parse throws, nothing is written or removed
+    backing.delete('dsh.itab.view.v2')
+    backing.set('dsh.itab.view.v1', 'not json{{{')
+    migrateViewStore()
+    assert.equal(backing.has('dsh.itab.view.v1'), true, 'corrupt payload untouched')
+    assert.equal(backing.has('dsh.itab.view.v2'), false, 'no v2 minted from garbage')
+  } finally {
+    delete globalThis.localStorage
+  }
+})
 
 /* ------------------------------ placement ------------------------------ */
 

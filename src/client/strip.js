@@ -432,13 +432,43 @@ function TabsStrip(props) {
     // opening instead.
     onShow: () => { if (chipTipState.current.cwd) branchCache.ensure([chipTipState.current.cwd]) },
   })
+  // Shell parity (sidebar sessionNode): a status entry exists for EVERY
+  // listed session, but its `running` stays undefined until the host
+  // observes that session — an entry with undefined must fall through to
+  // the list row's own flag, exactly like the sidebar's
+  // `status?.running ?? s.running`. Treating the entry as authoritative
+  // turned never-observed rows (fresh load, cross-host listings) into
+  // "not running" and their dots never showed.
+  const runningOf = (id) => {
+    const entry = statuses && typeof statuses.get === 'function' ? statuses.get(id) : undefined
+    if (entry && entry.running !== undefined) return entry.running === true
+    const row = sessions && sessions.byId ? sessions.byId[id] : undefined
+    return !!(row && row.running)
+  }
+  // A parent session whose SUBAGENTS are still running shows ongoing in
+  // the sidebar (running-subagent count over the session catalog); the
+  // chips owe the same answer. Catalog shape mirrors the shell:
+  // sessions.projectionsBySession[parent].values.subagentCatalog.
+  const runningSubagentsOf = (id) => {
+    const projections = sessions && sessions.projectionsBySession ? sessions.projectionsBySession : null
+    const catalog = projections && projections[id] && projections[id].values
+      ? projections[id].values.subagentCatalog : null
+    if (!Array.isArray(catalog)) return 0
+    let count = 0
+    for (const child of catalog) {
+      if (!child || child.id === undefined || child.id === null) continue
+      if (runningOf(String(child.id))) count += 1
+    }
+    return count
+  }
   const stateOf = (id) => {
     const status = statuses && typeof statuses.get === 'function' ? statuses.get(id) : undefined
     const summary = sessions && sessions.byId ? sessions.byId[id] : undefined
     return sessionStateOf({
-      running: status ? status.running === true : !!(summary && summary.running),
+      running: runningOf(id),
       completed: status ? status.completionUnread === true : !!(summary && summary.completed),
       pending: status && status.pendingInteraction ? status.pendingInteraction.kind : undefined,
+      subagents: runningSubagentsOf(id),
     }, sessionId === id)
   }
 

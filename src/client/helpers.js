@@ -22,8 +22,10 @@ function sessionTitleOf(summary, t) {
   return String(summary.displayTitle || summary.title || '')
 }
 
-/** Status classification shared by chips and menus. */
-function sessionStateOf(row, current) {
+/** Status classification shared by chips and menus. `subagents` is the
+ *  count of running child sessions (shell sidebar parity: a parent whose
+ *  subagents are still running shows ongoing even when it is idle). */
+export function sessionStateOf(row, current) {
   if (!row) return null
   if (row.pending === 'approval' || row.pending === 'plan-review' || row.pending === 'question') return 'warning'
   if (row.running || (row.subagents || 0) > 0) return 'ongoing'

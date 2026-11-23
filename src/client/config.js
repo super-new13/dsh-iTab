@@ -15,7 +15,9 @@ function ItabBundleConfig(props) {
   const cap = capFromPrefs(prefs)
   const statusDots = prefs.statusDots !== false
   const middleClickClose = prefs.middleClickClose !== false
-  const sidebarOpen = prefs.sidebarOpen === 'open' ? 'open' : 'replace'
+  // 'replace' must be chosen explicitly; anything else (including a key
+  // missing from an older snapshot) keeps the browser-like open default.
+  const sidebarOpen = prefs.sidebarOpen === 'replace' ? 'replace' : 'open'
 
   const switchRow = (key, label, hint, value) =>
     E('div', { className: 'itab-cfg-row', key: key },
@@ -58,6 +60,6 @@ function ItabBundleConfig(props) {
     switchRow('statusDots', t('config.statusDots'), t('config.statusDotsHint'), statusDots),
     switchRow('statusPulse', t('config.statusPulse'), t('config.statusPulseHint'), prefs.statusPulse === true),
     switchRow('middleClickClose', t('config.middleClickClose'), null, middleClickClose),
-    segRow('sidebarOpen', t('config.sidebarOpen'), null, ['replace', 'open'], sidebarOpen, (v) => t('config.sidebarOpen.' + v)),
+    segRow('sidebarOpen', t('config.sidebarOpen'), null, ['open', 'replace'], sidebarOpen, (v) => t('config.sidebarOpen.' + v)),
   )
 }
