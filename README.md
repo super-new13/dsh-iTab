@@ -64,7 +64,7 @@ Git 分支由宿主侧路由 `POST /dsh-itab/git-branch` 实时读取（`git sym
 | 平台 | 候选顺序 |
 |---|---|
 | macOS | `/opt/homebrew/bin/code` → `/usr/local/bin/code` → `/Applications/Visual Studio Code.app/…/bin/code` → PATH |
-| Windows | `%LOCALAPPDATA%\Programs\…\code.cmd`（用户安装）→ `%ProgramFiles%\…`（系统安装）→ PATH |
+| Windows | `%LOCALAPPDATA%\Programs\…\code.cmd`（用户安装）→ `%ProgramFiles%\…\code.cmd`（系统安装）→ PATH |
 | Linux | `/usr/bin/code` → `code-oss` → `/snap/bin/code` → `/usr/local/bin/code` |
 
 ### 6. 配置页
@@ -85,10 +85,22 @@ Git 分支由宿主侧路由 `POST /dsh-itab/git-branch` 实时读取（`git sym
 
 ## 安装
 
+将下方的 `web` 换成你实际使用的 DSH Web Profile 名称，然后重启该 Profile 对应的 Web 服务。
+
+```sh
+dsh plugin --profile web add 'github:super-new13/dsh-iTab#ff55900318283fab27635e12f98c2eb6a88c34e8'
+```
+
+已在 macOS 上用 DSH `0.2.2-rc.3`、Node `24.21.0` 和 pnpm `10.16.1` 通过独立 Profile 验证安装，`--dump-config` 可看到 `dsh-itab` 配置层。此次验证覆盖 CLI 安装和配置加载，未覆盖 Windows 实机和 Web 界面操作。
+
 ### 依赖
 
 - DSH `>=0.2.0-rc.1 <0.3.0-0`（在 0.2.2-rc.3 上开发验证）
 - 无任何 npm 运行时依赖；Node 22+（构建与测试）
+
+### 本地数据与宿主操作
+
+标签、关闭历史与偏好保存在浏览器 `localStorage`。Git 分支由 DSH 宿主读取。菜单中的 VS Code 和文件管理器快捷操作在宿主打开项目路径。Windows 上的 VS Code 快捷操作使用命令解释器处理项目路径，建议暂不使用该快捷操作。
 
 ## 开发
 
