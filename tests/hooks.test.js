@@ -94,15 +94,34 @@ test('useTabSync: deleting the on-screen session prunes its chip and clears the 
   assert.equal(model.tabsActive(), 'a')
 })
 
-test('useTabSync: deleting the last session (nothing on screen) still prunes, without history', (t) => {
+test('useTabSync: deleting the last session prunes its chip, without history', (t) => {
   const env = makeEnv()
   t.after(env.restore)
   env.ctx.__resetLastCurrent()
   model.saveTabs(['x'], 'x')
-  env.ctx.__useTabSync(snapshotWith('ready', {}, null), noWorkspaces, prefs)
+  // the host created a fresh blank session after the deletion, so the list is
+  // non-empty: absence there IS evidence of a deletion
+  env.ctx.__useTabSync(snapshotWith('ready', { fresh: true }, null), noWorkspaces, prefs)
   assert.deepEqual(model.tabsSnapshot(), [])
   assert.equal(model.tabsActive(), '')
   assert.deepEqual(model.historySnapshot(), [], 'deletion is not a close: nothing to reopen')
+})
+
+test('useTabSync: an empty ready list is a transient, never a reason to wipe the chips', (t) => {
+  const env = makeEnv()
+  t.after(env.restore)
+  env.ctx.__resetLastCurrent()
+  model.saveTabs(['a', 'b', 'c'], 'c')
+  // reconnect / list reload publishes { byId: {} } while phase is already 'ready';
+  // closing one tab used to wipe all three through this frame
+  const opened = []
+  env.ctx.__useTabSync(snapshotWith('ready', {}, 'c'), noWorkspaces, prefs, (id) => opened.push(id))
+  assert.deepEqual(model.tabsSnapshot(), ['a', 'b', 'c'], 'no chip is dropped')
+  assert.deepEqual(opened, [], 'and no fallback navigation is triggered')
+  // the real list comes back: everything survives untouched
+  env.ctx.__useTabSync(snapshotWith('ready', { a: false, b: false, c: false }, 'c'), noWorkspaces, prefs)
+  assert.deepEqual(model.tabsSnapshot(), ['a', 'b', 'c'])
+  assert.equal(model.tabsActive(), 'c')
 })
 
 test('useTabSync: a list that is not ready never prunes, even with an empty byId and no current', (t) => {

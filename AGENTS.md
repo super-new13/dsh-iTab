@@ -50,7 +50,7 @@ npm version patch --no-git-tag-version   # 升版，version 脚本会同步 dsh.
 - 偏好 store 的水合是**整体覆盖**的：`init` 默认值不会合并进已有快照，读 `prefs` 必须带兜底。
 - 界面文案进 `src/client/i18n.js` 的 `zh` 与 `en` 两份字典，key 必须一致（当前各 40 条）；`locale/*.json` 只放市场元数据。
 - 平台对象从 `P` 取（`P.React` / `P.E` / `P.storeKit`），且只能在工厂 `createItabPlugin()` 执行之后使用——模块顶层写 `class extends P.React.Component` 会在装配前求值成 null。
-- 会话列表只在 `sessions.phase === 'ready'` 时可信：`pending` 阶段 `byId` 是空的，任何按成员关系的清理都要门控，否则冷启动会清空用户的标签。
+- 会话列表只在 `sessions.phase === 'ready'` **且 `byId` 非空**时才可信：`pending` 阶段 `byId` 是空的，重连/列表重载也会短暂发布空列表；任何「不在 `byId` 里 = 已删除」的清理都必须同时门控这两个条件，否则会一次性清空用户的全部标签（0.3.4 修的就是这个）。
 - 标签条刻意不出现 `_tabs` 类名子串（避免命中宿主 view-nav 的 CSS 选择器）；样式集中在 `styles.js`。
 - 插槽 `conversation.header.leading` 的 `priority: -1` 是刻意抢占单座（压过其他标签插件），调整前想清楚影响。
 - 风格跟现有文件走：2 空格缩进、单引号、不加分号、注释用英文。没有 lint / 格式化工具，别引入。

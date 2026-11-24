@@ -65,11 +65,16 @@ function useTabSync(sessions, useWorkspaces, prefs, open) {
     // authoritative once the baseline fetch landed ('ready'). Pruning by
     // membership before that would wipe every persisted tab at startup.
     const listReady = !!(byId && sessions && sessions.phase === 'ready')
+    // An EMPTY ready list is never trustworthy evidence that every session was
+    // deleted: a reconnect or a list reload publishes one for at least a frame,
+    // and pruning against it wiped the whole strip (3 chips gone after closing
+    // a single tab). Absence only counts once the list has entries.
+    const hostCount = byId ? Object.keys(byId).length : 0
     const current = currentSessionIdOf(sessions)
     const previous = lastCurrentId || undefined
     const archived = new Set(archivedIds.map(String))
     const isArchived = (id) => archived.has(String(id))
-    const isDeleted = listReady ? (id) => !byId[id] : () => false
+    const isDeleted = listReady && hostCount > 0 ? (id) => !byId[id] : () => false
     // The chips that still point at a live, unarchived session.
     const live = tabsSnapshot().filter((id) => !isArchived(id) && !isDeleted(id))
 
@@ -79,7 +84,7 @@ function useTabSync(sessions, useWorkspaces, prefs, open) {
     // fall back to the last surviving tab, the way closing a browser tab
     // does. When nothing survives, the open/replace rule below still runs
     // so the blank session keeps a chip — an empty strip would be a dead end.
-    const onScreenDeleted = !!(listReady && previous && !byId[previous])
+    const onScreenDeleted = !!(listReady && hostCount > 0 && previous && !byId[previous])
     if (onScreenDeleted && live.length && !(current && live.includes(current))) {
       const target = live[live.length - 1]
       if (!sameTabList(tabsSnapshot(), live)) saveTabs(live, target)
