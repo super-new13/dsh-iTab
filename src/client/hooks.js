@@ -242,7 +242,7 @@ function useStripFill(barRef, deps) {
       // Never cap the bar into an overflow of its own: when the chips already
       // fit before the shell's controls, the cap only squeezes the strip and
       // makes it scroll (which then looks like a stray indent).
-      const next = stripRoomFor(limit, barRect.left, headerRect.width, bar.scrollWidth)
+      const next = stripRoomFor(limit, barRect.left, headerRect.width)
       setRoom((prev) => (Math.abs(prev - next) < 2 ? prev : next))
     }
     measure()

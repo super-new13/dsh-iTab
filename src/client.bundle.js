@@ -366,10 +366,23 @@ function stripFillWidth(limitLeft, barLeft, headerWidth, minimum = 180, reserve 
 // 0 means "do not cap": either nothing sits to the right of the bar, or the
 // bar's natural content already fits — capping in that case would only make
 // the strip scroll on its own and look indented.
-function stripRoomFor(limitLeft, barLeft, headerWidth, naturalWidth) {
+//
+// The gap before the controls is a real gutter, not a reserve: a wide reserve
+// starves the strip in a narrow window, squeezing three chips into the corner
+// while the header still has empty space to the right of them.
+const STRIP_GAP = 16
+const STRIP_MIN_ROOM = 240
+
+// maxWidth only ever constrains (it never stretches the bar), so this can be
+// applied unconditionally whenever something sits to the right of the bar.
+function stripRoomFor(limitLeft, barLeft, headerWidth) {
   if (!Number.isFinite(limitLeft)) return 0
-  if (naturalWidth > 0 && naturalWidth <= limitLeft - barLeft) return 0
-  return stripFillWidth(limitLeft, barLeft, headerWidth, 0, 100)
+  const available = Math.max(0, limitLeft - barLeft)
+  const room = stripFillWidth(limitLeft, barLeft, headerWidth, 0, STRIP_GAP)
+  if (room <= 0) return 0
+  // Keep the strip usable when the row can afford it: a cap that leaves room
+  // for less than a couple of chips reads as a stray indent, not as a cap.
+  return Math.max(room, Math.min(STRIP_MIN_ROOM, Math.max(0, available - STRIP_GAP)))
 }
 
 
@@ -563,6 +576,9 @@ const ITAB_CSS = [
   /* ---- the strip ---- */
   '.itab-tabbar{display:flex;align-items:center;gap:4px;min-width:0;max-width:70vw;-webkit-app-region:no-drag;app-region:no-drag}',
   '.itab-strip{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-app-region:no-drag;app-region:no-drag}',
+  /* Capped bar (narrow window, or many tabs): narrower chips let more of
+     them fit before the strip starts scrolling. */
+  '.itab-tabbar[data-itab-tight="1"] .itab-tab{min-width:64px;padding-left:8px}',
   '.itab-strip::-webkit-scrollbar{display:none}',
   '.itab-strip[data-itab-fade-right="1"]:not([data-itab-fade-left="1"]){-webkit-mask-image:linear-gradient(to left,transparent,#000 16px);mask-image:linear-gradient(to left,transparent,#000 16px)}',
   '.itab-strip[data-itab-fade-left="1"]:not([data-itab-fade-right="1"]){-webkit-mask-image:linear-gradient(to right,transparent,#000 16px);mask-image:linear-gradient(to right,transparent,#000 16px)}',
@@ -1550,7 +1566,7 @@ function useStripFill(barRef, deps) {
       // Never cap the bar into an overflow of its own: when the chips already
       // fit before the shell's controls, the cap only squeezes the strip and
       // makes it scroll (which then looks like a stray indent).
-      const next = stripRoomFor(limit, barRect.left, headerRect.width, bar.scrollWidth)
+      const next = stripRoomFor(limit, barRect.left, headerRect.width)
       setRoom((prev) => (Math.abs(prev - next) < 2 ? prev : next))
     }
     measure()
@@ -2356,6 +2372,7 @@ function TabsStrip(props) {
     ref: barRef,
     className: 'itab-tabbar',
     'data-itab-overflow': overflow.overflowing ? '1' : '0',
+    'data-itab-tight': roomWidth > 0 && roomWidth < 420 ? '1' : '0',
     style: Object.assign(
       { '--itab-tab-max': maxWidth + 'px' },
       roomWidth > 0 ? { maxWidth: roomWidth + 'px' } : null,

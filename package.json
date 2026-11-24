@@ -1,6 +1,6 @@
 {
   "name": "dsh-itab",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "author": "morgan",
   "description": "DSH web plugin: browser-style session tabs for the conversation header — roomier tabs, middle-click close, and one-click close others / close right / close all / reopen closed.",
   "repository": {

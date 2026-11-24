@@ -585,6 +585,7 @@ function TabsStrip(props) {
     ref: barRef,
     className: 'itab-tabbar',
     'data-itab-overflow': overflow.overflowing ? '1' : '0',
+    'data-itab-tight': roomWidth > 0 && roomWidth < 420 ? '1' : '0',
     style: Object.assign(
       { '--itab-tab-max': maxWidth + 'px' },
       roomWidth > 0 ? { maxWidth: roomWidth + 'px' } : null,

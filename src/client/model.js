@@ -336,8 +336,21 @@ export function stripFillWidth(limitLeft, barLeft, headerWidth, minimum = 180, r
 // 0 means "do not cap": either nothing sits to the right of the bar, or the
 // bar's natural content already fits — capping in that case would only make
 // the strip scroll on its own and look indented.
-export function stripRoomFor(limitLeft, barLeft, headerWidth, naturalWidth) {
+//
+// The gap before the controls is a real gutter, not a reserve: a wide reserve
+// starves the strip in a narrow window, squeezing three chips into the corner
+// while the header still has empty space to the right of them.
+export const STRIP_GAP = 16
+export const STRIP_MIN_ROOM = 240
+
+// maxWidth only ever constrains (it never stretches the bar), so this can be
+// applied unconditionally whenever something sits to the right of the bar.
+export function stripRoomFor(limitLeft, barLeft, headerWidth) {
   if (!Number.isFinite(limitLeft)) return 0
-  if (naturalWidth > 0 && naturalWidth <= limitLeft - barLeft) return 0
-  return stripFillWidth(limitLeft, barLeft, headerWidth, 0, 100)
+  const available = Math.max(0, limitLeft - barLeft)
+  const room = stripFillWidth(limitLeft, barLeft, headerWidth, 0, STRIP_GAP)
+  if (room <= 0) return 0
+  // Keep the strip usable when the row can afford it: a cap that leaves room
+  // for less than a couple of chips reads as a stray indent, not as a cap.
+  return Math.max(room, Math.min(STRIP_MIN_ROOM, Math.max(0, available - STRIP_GAP)))
 }

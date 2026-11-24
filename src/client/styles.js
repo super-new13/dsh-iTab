@@ -21,6 +21,9 @@ const ITAB_CSS = [
   /* ---- the strip ---- */
   '.itab-tabbar{display:flex;align-items:center;gap:4px;min-width:0;max-width:70vw;-webkit-app-region:no-drag;app-region:no-drag}',
   '.itab-strip{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-app-region:no-drag;app-region:no-drag}',
+  /* Capped bar (narrow window, or many tabs): narrower chips let more of
+     them fit before the strip starts scrolling. */
+  '.itab-tabbar[data-itab-tight="1"] .itab-tab{min-width:64px;padding-left:8px}',
   '.itab-strip::-webkit-scrollbar{display:none}',
   '.itab-strip[data-itab-fade-right="1"]:not([data-itab-fade-left="1"]){-webkit-mask-image:linear-gradient(to left,transparent,#000 16px);mask-image:linear-gradient(to left,transparent,#000 16px)}',
   '.itab-strip[data-itab-fade-left="1"]:not([data-itab-fade-right="1"]){-webkit-mask-image:linear-gradient(to right,transparent,#000 16px);mask-image:linear-gradient(to right,transparent,#000 16px)}',

@@ -204,16 +204,19 @@ test('stripFillWidth stays roomier than the reference', () => {
   assert.equal(stripFillWidth(2000, 0, 1000), 700)
 })
 
-test('stripRoomFor only caps when the bar would actually collide', () => {
-  // Nothing to the right of the bar: no cap at all.
-  assert.equal(stripRoomFor(Infinity, 16, 1600, 400), 0)
-  // Chips already fit before the shell controls: capping would only make the
-  // strip scroll on its own (that is what looked like a stray indent).
-  assert.equal(stripRoomFor(1200, 16, 1600, 727), 0)
-  // Content is wider than the room: cap it to the space that is left.
-  assert.equal(stripRoomFor(1200, 16, 1600, 1400), 1084)
-  // Degenerate widths fall back to the plain fill rule.
-  assert.equal(stripRoomFor(260, 16, 1600, 0), 144)
+test('stripRoomFor caps to the space before the shell controls', () => {
+  // Nothing to the right of the bar: no cap at all (CSS 70vw still applies).
+  assert.equal(stripRoomFor(Infinity, 16, 1600), 0)
+  // Roomier than the reference: a 16px gutter, never past 70% of the header.
+  assert.equal(stripRoomFor(1200, 16, 1600), 1120)
+  // The narrow-window case seen in the GUI: 679px header, leading region at
+  // 301, shell controls at 609. The old 100px reserve capped the bar at 208
+  // and squeezed three chips into 118px; a real gutter gives it 292.
+  assert.equal(stripRoomFor(609, 301, 679), 292)
+  // Cramped row: the gutter wins over the 240px floor (available 224).
+  assert.equal(stripRoomFor(240, 16, 1600), 208)
+  // Degenerate measurement (controls left of the bar): no cap, never negative.
+  assert.equal(stripRoomFor(300, 301, 679), 0)
 })
 
 test('DEFAULT_MAX_TABS is roomier than the reference cap', () => {
