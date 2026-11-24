@@ -389,24 +389,32 @@ function stripRoomFor(limitLeft, barLeft, headerWidth) {
   return Math.max(room, Math.min(STRIP_MIN_ROOM, available))
 }
 
-// Chips never get narrower than this: a row that cannot hold whole chips
-// scrolls instead of shaving the last one down to a single glyph.
+// Chips never get narrower than this: the row fills with whole chips and the
+// ones that do not fit sit completely past the right edge (the strip
+// scrolls), instead of the last chip being shaved down to a single glyph.
 const CHIP_MIN_WIDTH = 128
 const CHIP_GAP = 4
+// Add / history / overflow buttons plus their gaps: the room the chips lose.
+const STRIP_BUTTONS_WIDTH = 90
 
-// Width the strip must take when the tabs cannot all fit at CHIP_MIN_WIDTH:
-// the largest multiple of (chip + gap) that fits, so the row ends on a chip
-// boundary rather than mid-glyph; the remaining tabs scroll. `width: 0` means
-// "no snapping needed" — the chips simply share the row.
-function stripFitWidth(available, tabCount) {
-  const room = Math.floor(available)
-  const count = Math.floor(tabCount)
-  if (!(room > 0) || !(count > 0)) return { width: 0, chipWidth: 0 }
-  const perRow = Math.max(1, Math.floor((room + CHIP_GAP) / (CHIP_MIN_WIDTH + CHIP_GAP)))
-  if (count <= perRow) return { width: 0, chipWidth: 0 }
+// Lay the strip out for a known row width. Chips take an equal share of
+// (row - buttons), clamped to [CHIP_MIN_WIDTH, maxChip]; when that share would
+// drop under the minimum, fewer chips are shown and the strip scrolls. A null
+// result means "no definite row width": leave the CSS fallback in charge.
+function stripLayout(roomWidth, tabCount, maxChip = 240) {
+  if (!(roomWidth > 0) || !(tabCount > 0)) return null
+  const available = Math.max(0, roomWidth - STRIP_BUTTONS_WIDTH)
+  if (available < CHIP_MIN_WIDTH) {
+    return { visible: 1, chipWidth: CHIP_MIN_WIDTH, stripWidth: CHIP_MIN_WIDTH }
+  }
+  const perRow = Math.max(1, Math.floor((available + CHIP_GAP) / (CHIP_MIN_WIDTH + CHIP_GAP)))
+  const visible = Math.min(tabCount, perRow)
+  const share = (available - CHIP_GAP * (visible - 1)) / visible
+  const chipWidth = Math.max(CHIP_MIN_WIDTH, Math.min(maxChip, Math.floor(share)))
   return {
-    width: perRow * CHIP_MIN_WIDTH + (perRow - 1) * CHIP_GAP,
-    chipWidth: CHIP_MIN_WIDTH,
+    visible,
+    chipWidth,
+    stripWidth: Math.min(available, visible * chipWidth + CHIP_GAP * (visible - 1)),
   }
 }
 
@@ -1514,31 +1522,6 @@ function useStripOverflow(stripRef, deps) {
   return state
 }
 
-/** Snaps the strip to whole chips when not all tabs fit at CHIP_MIN_WIDTH, so
- *  the row never ends mid-chip; the rest scrolls. Widths come from the model. */
-function useStripFit(stripRef, tabCount) {
-  const React = P.React
-  const [fit, setFit] = React.useState({ width: 0, chipWidth: 0 })
-  React.useLayoutEffect(() => {
-    const el = stripRef.current
-    if (!el) return undefined
-    const measure = () => {
-      const next = stripFitWidth(el.clientWidth, tabCount)
-      setFit((prev) => (prev.width === next.width && prev.chipWidth === next.chipWidth ? prev : next))
-    }
-    measure()
-    let observer = null
-    if (typeof ResizeObserver === 'function') {
-      observer = new ResizeObserver(measure)
-      observer.observe(el)
-    }
-    return () => {
-      if (observer) observer.disconnect()
-    }
-  }, [tabCount])
-  return fit
-}
-
 /** Scrolls the active chip into view (instant: the shell remounts the
  *  header during navigation, so smooth scrolling never finishes). */
 function useRevealActive(stripRef, sessionId, tabCount) {
@@ -1608,10 +1591,20 @@ function useStripFill(barRef, deps) {
         if (rect.bottom <= barRect.top + 2 || rect.top >= barRect.bottom - 2) continue
         const style = window.getComputedStyle(node)
         if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue
-        if (rect.left <= leadingRight + 8 && rect.right >= headerRect.right - 40) continue
-        if (headerRect.right - rect.right > 120) continue
+        // Anything starting where the leading region ends is the title row
+        // (it spans us to the far right); only a compact cluster further right
+        // can be the limit. The old "within 120px of the header's right edge"
+        // rule missed the shell's actions when the window was narrow, which
+        // left the bar uncapped and the tabs shrink-wrapped into a corner.
+        if (rect.left <= leadingRight + 8) continue
         if (rect.left <= barRect.left + 8) continue
         if (rect.left < limit) limit = rect.left
+      }
+      if (limit === Infinity) {
+        // Last resort: the shell's action cluster, wherever it sits.
+        const actions = header.querySelector('[class*="_headerActions"]')
+        const rect = actions ? actions.getBoundingClientRect() : null
+        if (rect && rect.width > 0 && rect.left > barRect.left + 8) limit = rect.left
       }
       if (limit === Infinity) return
       // Never cap the bar into an overflow of its own: when the chips already
@@ -2196,8 +2189,8 @@ function TabsStrip(props) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const [ctx, setCtx] = React.useState(null) // { x, y, id }
   const overflow = useStripOverflow(stripRef, [tabs.length, sessionId, enabled])
-  const fit = useStripFit(stripRef, tabs.length)
   const roomWidth = useStripFill(barRef, [tabs.length, sessionId, enabled])
+  const layout = stripLayout(roomWidth, tabs.length, maxWidth)
   useRevealActive(stripRef, sessionId, tabs.length)
   useWheelScroll(stripRef)
   // Hover bubble state: the second line carries the hovered project's git
@@ -2438,11 +2431,12 @@ function TabsStrip(props) {
       'data-itab-tabs': String(tabs.length),
       'data-itab-fade-left': overflow.canLeft ? '1' : '0',
       'data-itab-fade-right': overflow.canRight ? '1' : '0',
-      // Chips share the row at 1/n; when that would drop them under their
-      // minimum, the strip snaps to whole chips and the rest scrolls.
+      // The bar only ever caps at the row it may use, so the layout has to be
+      // computed here: chips share (row - buttons) equally and the row fills
+      // with whole chips — the ones that do not fit start past the right edge.
       style: Object.assign(
         { '--itab-count': String(Math.max(1, tabs.length)) },
-        fit.width > 0 ? { maxWidth: fit.width + 'px', '--itab-chip-w': fit.chipWidth + 'px' } : null,
+        layout ? { width: layout.stripWidth + 'px', '--itab-chip-w': layout.chipWidth + 'px' } : null,
       ),
     },
       tabs.map((id) => {

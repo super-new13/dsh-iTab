@@ -359,23 +359,31 @@ export function stripRoomFor(limitLeft, barLeft, headerWidth) {
   return Math.max(room, Math.min(STRIP_MIN_ROOM, available))
 }
 
-// Chips never get narrower than this: a row that cannot hold whole chips
-// scrolls instead of shaving the last one down to a single glyph.
+// Chips never get narrower than this: the row fills with whole chips and the
+// ones that do not fit sit completely past the right edge (the strip
+// scrolls), instead of the last chip being shaved down to a single glyph.
 export const CHIP_MIN_WIDTH = 128
 export const CHIP_GAP = 4
+// Add / history / overflow buttons plus their gaps: the room the chips lose.
+export const STRIP_BUTTONS_WIDTH = 90
 
-// Width the strip must take when the tabs cannot all fit at CHIP_MIN_WIDTH:
-// the largest multiple of (chip + gap) that fits, so the row ends on a chip
-// boundary rather than mid-glyph; the remaining tabs scroll. `width: 0` means
-// "no snapping needed" — the chips simply share the row.
-export function stripFitWidth(available, tabCount) {
-  const room = Math.floor(available)
-  const count = Math.floor(tabCount)
-  if (!(room > 0) || !(count > 0)) return { width: 0, chipWidth: 0 }
-  const perRow = Math.max(1, Math.floor((room + CHIP_GAP) / (CHIP_MIN_WIDTH + CHIP_GAP)))
-  if (count <= perRow) return { width: 0, chipWidth: 0 }
+// Lay the strip out for a known row width. Chips take an equal share of
+// (row - buttons), clamped to [CHIP_MIN_WIDTH, maxChip]; when that share would
+// drop under the minimum, fewer chips are shown and the strip scrolls. A null
+// result means "no definite row width": leave the CSS fallback in charge.
+export function stripLayout(roomWidth, tabCount, maxChip = 240) {
+  if (!(roomWidth > 0) || !(tabCount > 0)) return null
+  const available = Math.max(0, roomWidth - STRIP_BUTTONS_WIDTH)
+  if (available < CHIP_MIN_WIDTH) {
+    return { visible: 1, chipWidth: CHIP_MIN_WIDTH, stripWidth: CHIP_MIN_WIDTH }
+  }
+  const perRow = Math.max(1, Math.floor((available + CHIP_GAP) / (CHIP_MIN_WIDTH + CHIP_GAP)))
+  const visible = Math.min(tabCount, perRow)
+  const share = (available - CHIP_GAP * (visible - 1)) / visible
+  const chipWidth = Math.max(CHIP_MIN_WIDTH, Math.min(maxChip, Math.floor(share)))
   return {
-    width: perRow * CHIP_MIN_WIDTH + (perRow - 1) * CHIP_GAP,
-    chipWidth: CHIP_MIN_WIDTH,
+    visible,
+    chipWidth,
+    stripWidth: Math.min(available, visible * chipWidth + CHIP_GAP * (visible - 1)),
   }
 }

@@ -164,31 +164,6 @@ function useStripOverflow(stripRef, deps) {
   return state
 }
 
-/** Snaps the strip to whole chips when not all tabs fit at CHIP_MIN_WIDTH, so
- *  the row never ends mid-chip; the rest scrolls. Widths come from the model. */
-function useStripFit(stripRef, tabCount) {
-  const React = P.React
-  const [fit, setFit] = React.useState({ width: 0, chipWidth: 0 })
-  React.useLayoutEffect(() => {
-    const el = stripRef.current
-    if (!el) return undefined
-    const measure = () => {
-      const next = stripFitWidth(el.clientWidth, tabCount)
-      setFit((prev) => (prev.width === next.width && prev.chipWidth === next.chipWidth ? prev : next))
-    }
-    measure()
-    let observer = null
-    if (typeof ResizeObserver === 'function') {
-      observer = new ResizeObserver(measure)
-      observer.observe(el)
-    }
-    return () => {
-      if (observer) observer.disconnect()
-    }
-  }, [tabCount])
-  return fit
-}
-
 /** Scrolls the active chip into view (instant: the shell remounts the
  *  header during navigation, so smooth scrolling never finishes). */
 function useRevealActive(stripRef, sessionId, tabCount) {
@@ -258,10 +233,20 @@ function useStripFill(barRef, deps) {
         if (rect.bottom <= barRect.top + 2 || rect.top >= barRect.bottom - 2) continue
         const style = window.getComputedStyle(node)
         if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue
-        if (rect.left <= leadingRight + 8 && rect.right >= headerRect.right - 40) continue
-        if (headerRect.right - rect.right > 120) continue
+        // Anything starting where the leading region ends is the title row
+        // (it spans us to the far right); only a compact cluster further right
+        // can be the limit. The old "within 120px of the header's right edge"
+        // rule missed the shell's actions when the window was narrow, which
+        // left the bar uncapped and the tabs shrink-wrapped into a corner.
+        if (rect.left <= leadingRight + 8) continue
         if (rect.left <= barRect.left + 8) continue
         if (rect.left < limit) limit = rect.left
+      }
+      if (limit === Infinity) {
+        // Last resort: the shell's action cluster, wherever it sits.
+        const actions = header.querySelector('[class*="_headerActions"]')
+        const rect = actions ? actions.getBoundingClientRect() : null
+        if (rect && rect.width > 0 && rect.left > barRect.left + 8) limit = rect.left
       }
       if (limit === Infinity) return
       // Never cap the bar into an overflow of its own: when the chips already

@@ -22,8 +22,9 @@ import {
   subscribeTabs,
   stripFillWidth,
   stripRoomFor,
-  stripFitWidth,
+  stripLayout,
   CHIP_MIN_WIDTH,
+  STRIP_BUTTONS_WIDTH,
   STORAGE_KEY,
   normalizeHistory,
   pushHistory,
@@ -222,22 +223,21 @@ test('stripRoomFor caps to the space before the shell controls', () => {
   assert.equal(stripRoomFor(300, 301, 679), 0)
 })
 
-test('stripFitWidth keeps whole chips: the row ends on a chip boundary', () => {
-  // The GUI's narrow pane: 392px of strip, four tabs. Four chips at the 128px
-  // minimum need 524px, so the strip snaps to three whole chips instead of
-  // shaving the fourth down to a single glyph.
-  assert.deepEqual(stripFitWidth(392, 4), { width: 3 * CHIP_MIN_WIDTH + 2 * 4, chipWidth: CHIP_MIN_WIDTH })
-  // Three tabs in the same row already fit: nothing to snap.
-  assert.deepEqual(stripFitWidth(392, 3), { width: 0, chipWidth: 0 })
-  // Plenty of room: chips share the row.
-  assert.deepEqual(stripFitWidth(700, 5), { width: 0, chipWidth: 0 })
-  // One tab too many for the row: five whole chips, the sixth scrolls.
-  assert.deepEqual(stripFitWidth(700, 6), { width: 5 * CHIP_MIN_WIDTH + 4 * 4, chipWidth: CHIP_MIN_WIDTH })
-  // Narrower than a single chip: keep one, scroll the rest.
-  assert.deepEqual(stripFitWidth(150, 2), { width: CHIP_MIN_WIDTH, chipWidth: CHIP_MIN_WIDTH })
-  // Degenerate measurements never snap.
-  assert.deepEqual(stripFitWidth(0, 3), { width: 0, chipWidth: 0 })
-  assert.deepEqual(stripFitWidth(392, 0), { width: 0, chipWidth: 0 })
+test('stripLayout fills the row with whole chips and hides the rest', () => {
+  // No definite row width: leave the CSS fallback in charge.
+  assert.equal(stripLayout(0, 3), null)
+  assert.equal(stripLayout(509, 0), null)
+  // The GUI's narrow pane: a 509px row holds 419px of chips after the add /
+  // history / overflow buttons. Two tabs share it: 207px each, row filled.
+  assert.deepEqual(stripLayout(509, 2), { visible: 2, chipWidth: 207, stripWidth: 418 })
+  // Four tabs at a 128px minimum only fit three across; the fourth starts
+  // exactly past the right edge and scrolls in, so nothing is cut mid-glyph.
+  assert.deepEqual(stripLayout(509, 4), { visible: 3, chipWidth: 137, stripWidth: 419 })
+  // 128px is a floor, not the target: three tabs in a 1000px row share the
+  // space but stop at the configured 240px maximum.
+  assert.deepEqual(stripLayout(1000, 3), { visible: 3, chipWidth: 240, stripWidth: 728 })
+  // Less room than a single chip: keep one whole chip and scroll the rest.
+  assert.deepEqual(stripLayout(200, 2), { visible: 1, chipWidth: CHIP_MIN_WIDTH, stripWidth: CHIP_MIN_WIDTH })
 })
 
 test('DEFAULT_MAX_TABS is roomier than the reference cap', () => {
