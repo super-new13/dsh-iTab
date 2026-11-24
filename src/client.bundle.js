@@ -363,15 +363,18 @@ function stripFillWidth(limitLeft, barLeft, headerWidth, minimum = 180, reserve 
 }
 
 // Room the strip bar may occupy before the shell's right-hand controls.
-// 0 means "do not cap": either nothing sits to the right of the bar, or the
-// bar's natural content already fits — capping in that case would only make
-// the strip scroll on its own and look indented.
+// 0 means "do not cap": nothing sits to the right of the bar, or the bar's
+// natural content already fits — capping in that case would only make the
+// strip scroll on its own and look indented.
 //
 // The gap before the controls is a real gutter, not a reserve: a wide reserve
 // starves the strip in a narrow window, squeezing three chips into the corner
 // while the header still has empty space to the right of them.
 const STRIP_GAP = 16
-const STRIP_MIN_ROOM = 240
+// Floor for the capped bar. Chips keep their own 96px minimum, so this buys
+// two readable chips plus the add / history / overflow buttons; everything
+// past that scrolls with the wheel instead of being squashed into the corner.
+const STRIP_MIN_ROOM = 300
 
 // maxWidth only ever constrains (it never stretches the bar), so this can be
 // applied unconditionally whenever something sits to the right of the bar.
@@ -382,7 +385,8 @@ function stripRoomFor(limitLeft, barLeft, headerWidth) {
   if (room <= 0) return 0
   // Keep the strip usable when the row can afford it: a cap that leaves room
   // for less than a couple of chips reads as a stray indent, not as a cap.
-  return Math.max(room, Math.min(STRIP_MIN_ROOM, Math.max(0, available - STRIP_GAP)))
+  // The floor spends the gutter rather than shrinking the strip further.
+  return Math.max(room, Math.min(STRIP_MIN_ROOM, available))
 }
 
 
@@ -575,10 +579,9 @@ const ITAB_CSS = [
 
   /* ---- the strip ---- */
   '.itab-tabbar{display:flex;align-items:center;gap:4px;min-width:0;max-width:70vw;-webkit-app-region:no-drag;app-region:no-drag}',
-  '.itab-strip{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-app-region:no-drag;app-region:no-drag}',
-  /* Capped bar (narrow window, or many tabs): narrower chips let more of
-     them fit before the strip starts scrolling. */
-  '.itab-tabbar[data-itab-tight="1"] .itab-tab{min-width:64px;padding-left:8px}',
+  /* min-width keeps room for two chips even if a measurement goes wrong: past
+     that the strip scrolls with the wheel instead of squashing chips. */
+  '.itab-strip{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:min(196px,100%);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-app-region:no-drag;app-region:no-drag}',
   '.itab-strip::-webkit-scrollbar{display:none}',
   '.itab-strip[data-itab-fade-right="1"]:not([data-itab-fade-left="1"]){-webkit-mask-image:linear-gradient(to left,transparent,#000 16px);mask-image:linear-gradient(to left,transparent,#000 16px)}',
   '.itab-strip[data-itab-fade-left="1"]:not([data-itab-fade-right="1"]){-webkit-mask-image:linear-gradient(to right,transparent,#000 16px);mask-image:linear-gradient(to right,transparent,#000 16px)}',
@@ -2372,7 +2375,6 @@ function TabsStrip(props) {
     ref: barRef,
     className: 'itab-tabbar',
     'data-itab-overflow': overflow.overflowing ? '1' : '0',
-    'data-itab-tight': roomWidth > 0 && roomWidth < 420 ? '1' : '0',
     style: Object.assign(
       { '--itab-tab-max': maxWidth + 'px' },
       roomWidth > 0 ? { maxWidth: roomWidth + 'px' } : null,

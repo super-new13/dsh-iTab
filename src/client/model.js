@@ -333,15 +333,18 @@ export function stripFillWidth(limitLeft, barLeft, headerWidth, minimum = 180, r
 }
 
 // Room the strip bar may occupy before the shell's right-hand controls.
-// 0 means "do not cap": either nothing sits to the right of the bar, or the
-// bar's natural content already fits — capping in that case would only make
-// the strip scroll on its own and look indented.
+// 0 means "do not cap": nothing sits to the right of the bar, or the bar's
+// natural content already fits — capping in that case would only make the
+// strip scroll on its own and look indented.
 //
 // The gap before the controls is a real gutter, not a reserve: a wide reserve
 // starves the strip in a narrow window, squeezing three chips into the corner
 // while the header still has empty space to the right of them.
 export const STRIP_GAP = 16
-export const STRIP_MIN_ROOM = 240
+// Floor for the capped bar. Chips keep their own 96px minimum, so this buys
+// two readable chips plus the add / history / overflow buttons; everything
+// past that scrolls with the wheel instead of being squashed into the corner.
+export const STRIP_MIN_ROOM = 300
 
 // maxWidth only ever constrains (it never stretches the bar), so this can be
 // applied unconditionally whenever something sits to the right of the bar.
@@ -352,5 +355,6 @@ export function stripRoomFor(limitLeft, barLeft, headerWidth) {
   if (room <= 0) return 0
   // Keep the strip usable when the row can afford it: a cap that leaves room
   // for less than a couple of chips reads as a stray indent, not as a cap.
-  return Math.max(room, Math.min(STRIP_MIN_ROOM, Math.max(0, available - STRIP_GAP)))
+  // The floor spends the gutter rather than shrinking the strip further.
+  return Math.max(room, Math.min(STRIP_MIN_ROOM, available))
 }

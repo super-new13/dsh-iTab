@@ -211,10 +211,11 @@ test('stripRoomFor caps to the space before the shell controls', () => {
   assert.equal(stripRoomFor(1200, 16, 1600), 1120)
   // The narrow-window case seen in the GUI: 679px header, leading region at
   // 301, shell controls at 609. The old 100px reserve capped the bar at 208
-  // and squeezed three chips into 118px; a real gutter gives it 292.
-  assert.equal(stripRoomFor(609, 301, 679), 292)
-  // Cramped row: the gutter wins over the 240px floor (available 224).
-  assert.equal(stripRoomFor(240, 16, 1600), 208)
+  // and squeezed three chips into 118px; the gutter gives it 292, and the
+  // 300px floor spends the last 16px so two 96px chips still fit.
+  assert.equal(stripRoomFor(609, 301, 679), 300)
+  // Cramped row: the floor wins over the gutter (available 224).
+  assert.equal(stripRoomFor(240, 16, 1600), 224)
   // Degenerate measurement (controls left of the bar): no cap, never negative.
   assert.equal(stripRoomFor(300, 301, 679), 0)
 })
