@@ -136,6 +136,10 @@ function useStripOverflow(stripRef, deps) {
     if (!el) return undefined
     const measure = () => {
       const overflowing = el.scrollWidth > el.clientWidth + 1
+      // A strip that fits must render from its first chip. A leftover
+      // scrollLeft (from an earlier overflow, or a session switch that shrank
+      // the chips) would otherwise read as a phantom indent on the left.
+      if (!overflowing && el.scrollLeft !== 0) el.scrollLeft = 0
       const canLeft = el.scrollLeft > 1
       const canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
       setState((prev) => (prev.overflowing === overflowing && prev.canLeft === canLeft && prev.canRight === canRight
@@ -235,7 +239,10 @@ function useStripFill(barRef, deps) {
         if (rect.left < limit) limit = rect.left
       }
       if (limit === Infinity) return
-      const next = stripFillWidth(limit, barRect.left, headerRect.width, 0, 100)
+      // Never cap the bar into an overflow of its own: when the chips already
+      // fit before the shell's controls, the cap only squeezes the strip and
+      // makes it scroll (which then looks like a stray indent).
+      const next = stripRoomFor(limit, barRect.left, headerRect.width, bar.scrollWidth)
       setRoom((prev) => (Math.abs(prev - next) < 2 ? prev : next))
     }
     measure()

@@ -362,6 +362,16 @@ function stripFillWidth(limitLeft, barLeft, headerWidth, minimum = 180, reserve 
   return Math.round(Math.max(minimum, Math.min(room, byHeader)))
 }
 
+// Room the strip bar may occupy before the shell's right-hand controls.
+// 0 means "do not cap": either nothing sits to the right of the bar, or the
+// bar's natural content already fits — capping in that case would only make
+// the strip scroll on its own and look indented.
+function stripRoomFor(limitLeft, barLeft, headerWidth, naturalWidth) {
+  if (!Number.isFinite(limitLeft)) return 0
+  if (naturalWidth > 0 && naturalWidth <= limitLeft - barLeft) return 0
+  return stripFillWidth(limitLeft, barLeft, headerWidth, 0, 100)
+}
+
 
 /* ==================== i18n.js ==================== */
 /* dsh-iTab — dictionaries. Data only, registered as the "itab" locale
@@ -1434,6 +1444,10 @@ function useStripOverflow(stripRef, deps) {
     if (!el) return undefined
     const measure = () => {
       const overflowing = el.scrollWidth > el.clientWidth + 1
+      // A strip that fits must render from its first chip. A leftover
+      // scrollLeft (from an earlier overflow, or a session switch that shrank
+      // the chips) would otherwise read as a phantom indent on the left.
+      if (!overflowing && el.scrollLeft !== 0) el.scrollLeft = 0
       const canLeft = el.scrollLeft > 1
       const canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
       setState((prev) => (prev.overflowing === overflowing && prev.canLeft === canLeft && prev.canRight === canRight
@@ -1533,7 +1547,10 @@ function useStripFill(barRef, deps) {
         if (rect.left < limit) limit = rect.left
       }
       if (limit === Infinity) return
-      const next = stripFillWidth(limit, barRect.left, headerRect.width, 0, 100)
+      // Never cap the bar into an overflow of its own: when the chips already
+      // fit before the shell's controls, the cap only squeezes the strip and
+      // makes it scroll (which then looks like a stray indent).
+      const next = stripRoomFor(limit, barRect.left, headerRect.width, bar.scrollWidth)
       setRoom((prev) => (Math.abs(prev - next) < 2 ? prev : next))
     }
     measure()

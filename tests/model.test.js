@@ -21,6 +21,7 @@ import {
   setActiveTab,
   subscribeTabs,
   stripFillWidth,
+  stripRoomFor,
   STORAGE_KEY,
   normalizeHistory,
   pushHistory,
@@ -201,6 +202,18 @@ test('stripFillWidth stays roomier than the reference', () => {
   assert.equal(stripFillWidth(200, 16, 1600), 180)
   // never exceeds 70% of header width
   assert.equal(stripFillWidth(2000, 0, 1000), 700)
+})
+
+test('stripRoomFor only caps when the bar would actually collide', () => {
+  // Nothing to the right of the bar: no cap at all.
+  assert.equal(stripRoomFor(Infinity, 16, 1600, 400), 0)
+  // Chips already fit before the shell controls: capping would only make the
+  // strip scroll on its own (that is what looked like a stray indent).
+  assert.equal(stripRoomFor(1200, 16, 1600, 727), 0)
+  // Content is wider than the room: cap it to the space that is left.
+  assert.equal(stripRoomFor(1200, 16, 1600, 1400), 1084)
+  // Degenerate widths fall back to the plain fill rule.
+  assert.equal(stripRoomFor(260, 16, 1600, 0), 144)
 })
 
 test('DEFAULT_MAX_TABS is roomier than the reference cap', () => {

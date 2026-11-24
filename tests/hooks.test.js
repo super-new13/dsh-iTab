@@ -18,14 +18,22 @@ const source = ['model.js', 'store.js', 'helpers.js', 'hooks.js'].map(part).join
 function makeReact() {
   const slots = []
   let cursor = 0
+  const runEffect = (fn, deps) => {
+    const at = cursor++
+    const prev = slots[at]
+    const changed = !prev || !deps || deps.length !== prev.deps.length || deps.some((d, i) => d !== prev.deps[i])
+    slots[at] = { deps }
+    if (changed) fn()
+  }
   return {
     beginRender() { cursor = 0 },
-    useEffect(fn, deps) {
+    useEffect: runEffect,
+    useLayoutEffect: runEffect,
+    useState(initial) {
       const at = cursor++
-      const prev = slots[at]
-      const changed = !prev || !deps || deps.length !== prev.deps.length || deps.some((d, i) => d !== prev.deps[i])
-      slots[at] = { deps }
-      if (changed) fn()
+      if (!slots[at] || !('value' in slots[at])) slots[at] = { value: typeof initial === 'function' ? initial() : initial }
+      const slot = slots[at]
+      return [slot.value, (next) => { slot.value = typeof next === 'function' ? next(slot.value) : next }]
     },
   }
 }
@@ -49,9 +57,9 @@ function makeEnv() {
   const storage = makeStorage()
   globalThis.localStorage = storage.stub
   const P = { React: makeReact() }
-  const ctx = { P, localStorage: storage.stub }
+  const ctx = { P, localStorage: storage.stub, window: { addEventListener() {}, removeEventListener() {} } }
   vm.createContext(ctx)
-  vm.runInContext(source + '\nthis.__useTabSync = useTabSync; this.__resetLastCurrent = () => { lastCurrentId = ""; fallbackFrom = "" }', ctx)
+  vm.runInContext(source + '\nthis.__useTabSync = useTabSync; this.__useStripOverflow = useStripOverflow; this.__resetLastCurrent = () => { lastCurrentId = ""; fallbackFrom = "" }', ctx)
   return { ctx, restore: () => { delete globalThis.localStorage } }
 }
 
@@ -63,6 +71,30 @@ const snapshotWith = (phase, byId, mainView) => ({
 })
 const noWorkspaces = () => null
 const prefs = {}
+
+const fakeStrip = (scrollWidth, clientWidth, scrollLeft) => {
+  const el = { scrollWidth, clientWidth, scrollLeft, children: [], addEventListener() {}, removeEventListener() {} }
+  return { current: el }
+}
+
+test('useStripOverflow: a strip that fits always renders from offset 0', (t) => {
+  const env = makeEnv()
+  t.after(env.restore)
+  // Offset left over from an earlier overflow (or a session switch that shrank
+  // the chips): with everything fitting, it must snap back — otherwise the
+  // first chip looks indented for the rest of that session.
+  const fits = fakeStrip(667, 667, 37)
+  env.ctx.__useStripOverflow(fits, [])
+  assert.equal(fits.current.scrollLeft, 0)
+})
+
+test('useStripOverflow: a genuinely overflowing strip keeps its offset', (t) => {
+  const env = makeEnv()
+  t.after(env.restore)
+  const wide = fakeStrip(900, 600, 250)
+  env.ctx.__useStripOverflow(wide, [])
+  assert.equal(wide.current.scrollLeft, 250, 'scrolled chips stay put')
+})
 
 test('useTabSync: pending list (empty byId) never wipes the persisted tabs', (t) => {
   const env = makeEnv()

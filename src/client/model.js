@@ -331,3 +331,13 @@ export function stripFillWidth(limitLeft, barLeft, headerWidth, minimum = 180, r
   const byHeader = headerWidth * 0.7
   return Math.round(Math.max(minimum, Math.min(room, byHeader)))
 }
+
+// Room the strip bar may occupy before the shell's right-hand controls.
+// 0 means "do not cap": either nothing sits to the right of the bar, or the
+// bar's natural content already fits — capping in that case would only make
+// the strip scroll on its own and look indented.
+export function stripRoomFor(limitLeft, barLeft, headerWidth, naturalWidth) {
+  if (!Number.isFinite(limitLeft)) return 0
+  if (naturalWidth > 0 && naturalWidth <= limitLeft - barLeft) return 0
+  return stripFillWidth(limitLeft, barLeft, headerWidth, 0, 100)
+}
