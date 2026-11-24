@@ -31,9 +31,11 @@ function useTabsSurface(enabled) {
 /** Keeps the persisted tab list attached to the session on screen.
  *
  * Reconciles on every sessions-store change: archived sessions drop,
- * blank (newly created) sessions gain their chip, and a navigation is
- * an open (default) or a replace (opt-in) per prefs. Writes only
- * when the list actually changed, so an idle store costs no renders. */
+ * sessions deleted from the sidebar drop too (their tab closes by
+ * itself — once the host's session list has loaded), blank (newly
+ * created) sessions gain their chip, and a navigation is an open
+ * (default) or a replace (opt-in) per prefs. Writes only when the
+ * list actually changed, so an idle store costs no renders. */
 // Module scope on purpose: the shell remounts the conversation header (and
 // this strip with it) on every navigation, which wipes any useRef. Keeping
 // the last on-screen session id in the module lets the post-remount
@@ -51,8 +53,17 @@ function useTabSync(sessions, useWorkspaces, prefs) {
   const cap = capFromPrefs(prefs)
   React.useEffect(() => {
     const byId = sessions && sessions.byId ? sessions.byId : null
+    // The host list starts 'pending' with an EMPTY byId and only becomes
+    // authoritative once the baseline fetch landed ('ready'). Pruning by
+    // membership before that would wipe every persisted tab at startup.
+    const listReady = !!(byId && sessions && sessions.phase === 'ready')
     const current = currentSessionIdOf(sessions)
-    if (!current) return
+    if (!current) {
+      // No session on screen (e.g. the last one was just deleted): still
+      // prune, so the strip does not keep a chip for a session that is gone.
+      if (listReady) pruneDeletedTabs(byId)
+      return
+    }
     const previous = lastCurrentId || undefined
     lastCurrentId = current
     if (previous !== current && tabsActive() !== current) setActiveTab(current)
@@ -60,12 +71,33 @@ function useTabSync(sessions, useWorkspaces, prefs) {
     const next = reconcileTabs(tabsSnapshot(), current, previous, {
       isBlank: (id) => !!(byId && byId[id] && byId[id].blank),
       isArchived: (id) => archived.has(String(id)),
+      isDeleted: listReady ? (id) => !byId[id] : undefined,
       sidebarOpen,
       cap,
     })
     const before = tabsSnapshot()
-    if (next.length !== before.length || next.some((id, at) => id !== before[at])) saveTabs(next)
+    const storedActive = tabsActive()
+    const activeGone = !!storedActive && !next.includes(storedActive)
+    const listChanged = next.length !== before.length || next.some((id, at) => id !== before[at])
+    if (!listChanged && !activeGone) return
+    // saveTabs treats a second argument as "set the active id", so the
+    // no-fallback write must pass exactly one argument.
+    if (activeGone) saveTabs(next, current || '')
+    else saveTabs(next)
   }, [sessions, archivedIds, sidebarOpen, cap])
+}
+
+/** Drops the chips of sessions that no longer exist in the authoritative
+ *  list, without touching the on-screen session (there is none here).
+ *  A deleted session is not a "closed" one: it cannot be reopened, so it
+ *  deliberately stays out of the close history. */
+function pruneDeletedTabs(byId) {
+  const before = tabsSnapshot()
+  const next = before.filter((id) => !!byId[id])
+  if (next.length === before.length) return
+  const active = tabsActive()
+  if (active && next.includes(active)) saveTabs(next)
+  else saveTabs(next, '')
 }
 
 /** Whether the strip overflows and which edges can scroll. */

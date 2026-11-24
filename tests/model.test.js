@@ -152,6 +152,20 @@ test('reconcileTabs never resurrects a deliberately closed current tab (no navig
   assert.deepEqual(reconcileTabs(['b'], 'new', 'b', { isBlank: blank }), ['b', 'new'])
 })
 
+test('reconcileTabs drops deleted sessions (isDeleted) and never strands the on-screen one', () => {
+  const deleted = (id) => id === 'b' || id === 'd'
+  // a background tab whose session was removed from the sidebar closes itself
+  assert.deepEqual(reconcileTabs(T, 'a', 'a', { isDeleted: deleted }), ['a', 'c', 'e'])
+  // the previously-active (deleted) tab is gone → current still gets a tab
+  assert.deepEqual(reconcileTabs(T, 'z', 'b', { isDeleted: deleted, sidebarOpen: 'replace' }), ['a', 'c', 'e', 'z'])
+  // replace mode: a surviving previous tab is replaced by the new current
+  assert.deepEqual(reconcileTabs(T, 'z', 'c', { isDeleted: deleted, sidebarOpen: 'replace' }), ['a', 'z', 'e'])
+  // no predicate → nothing pruned (cold start: list not authoritative yet)
+  assert.deepEqual(reconcileTabs(T, 'a', 'a'), T)
+  // no session on screen: prune still happens
+  assert.deepEqual(reconcileTabs(T, null, 'a', { isDeleted: deleted }), ['a', 'c', 'e'])
+})
+
 test('persistence roundtrips through localStorage', (t) => {
   const backing = new Map()
   globalThis.localStorage = {

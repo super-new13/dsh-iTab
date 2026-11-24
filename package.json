@@ -1,6 +1,6 @@
 {
   "name": "dsh-itab",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "author": "morgan",
   "description": "DSH web plugin: browser-style session tabs for the conversation header — roomier tabs, middle-click close, and one-click close others / close right / close all / reopen closed.",
   "repository": {
@@ -51,7 +51,7 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test tests/branch.test.js tests/bundle.test.js tests/client-parts.test.js tests/editor.test.js tests/model.test.js",
+    "test": "node --test tests/branch.test.js tests/bundle.test.js tests/client-parts.test.js tests/editor.test.js tests/hooks.test.js tests/model.test.js",
     "verify": "npm run build && npm test",
     "prepack": "npm run build",
     "version": "node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('dsh.plugin.json','utf8'));const v=JSON.parse(fs.readFileSync('package.json','utf8')).version;m.version=v;fs.writeFileSync('dsh.plugin.json',JSON.stringify(m,null,2)+'\\n')\""

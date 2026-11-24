@@ -153,8 +153,11 @@ export function reconcileTabs(tabs, currentId, previousId, options = {}) {
   const previous = tabIdOf(previousId)
   const isBlank = options.isBlank ?? (() => false)
   const isArchived = options.isArchived ?? (() => false)
+  // Only passed by the caller once the session list is authoritative
+  // (a deleted session is gone from the list); absent → nothing is pruned.
+  const isDeleted = options.isDeleted ?? (() => false)
   const sidebarOpen = options.sidebarOpen ?? 'open'
-  let kept = normalizeTabs(tabs, Number.MAX_SAFE_INTEGER).filter((id) => !isArchived(id))
+  let kept = normalizeTabs(tabs, Number.MAX_SAFE_INTEGER).filter((id) => !isArchived(id) && !isDeleted(id))
   if (!current) return kept.slice(0, cap)
   if (kept.includes(current)) return kept.slice(0, cap)
   // No navigation happened (same session stays on screen): its tab was closed
