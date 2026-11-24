@@ -1,6 +1,6 @@
 {
   "id": "dsh-external/dsh-itab",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "main": "./src/index.js",
   "description": "浏览器式会话标签页：更宽敞的标签条，支持一键关闭其他/右侧/全部标签页、重新打开已关闭标签页、中键关闭、状态圆点与拖拽排序，附插件配置页。",
   "engines": {

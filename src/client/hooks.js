@@ -164,6 +164,31 @@ function useStripOverflow(stripRef, deps) {
   return state
 }
 
+/** Snaps the strip to whole chips when not all tabs fit at CHIP_MIN_WIDTH, so
+ *  the row never ends mid-chip; the rest scrolls. Widths come from the model. */
+function useStripFit(stripRef, tabCount) {
+  const React = P.React
+  const [fit, setFit] = React.useState({ width: 0, chipWidth: 0 })
+  React.useLayoutEffect(() => {
+    const el = stripRef.current
+    if (!el) return undefined
+    const measure = () => {
+      const next = stripFitWidth(el.clientWidth, tabCount)
+      setFit((prev) => (prev.width === next.width && prev.chipWidth === next.chipWidth ? prev : next))
+    }
+    measure()
+    let observer = null
+    if (typeof ResizeObserver === 'function') {
+      observer = new ResizeObserver(measure)
+      observer.observe(el)
+    }
+    return () => {
+      if (observer) observer.disconnect()
+    }
+  }, [tabCount])
+  return fit
+}
+
 /** Scrolls the active chip into view (instant: the shell remounts the
  *  header during navigation, so smooth scrolling never finishes). */
 function useRevealActive(stripRef, sessionId, tabCount) {

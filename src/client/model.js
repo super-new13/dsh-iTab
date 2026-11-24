@@ -358,3 +358,24 @@ export function stripRoomFor(limitLeft, barLeft, headerWidth) {
   // The floor spends the gutter rather than shrinking the strip further.
   return Math.max(room, Math.min(STRIP_MIN_ROOM, available))
 }
+
+// Chips never get narrower than this: a row that cannot hold whole chips
+// scrolls instead of shaving the last one down to a single glyph.
+export const CHIP_MIN_WIDTH = 128
+export const CHIP_GAP = 4
+
+// Width the strip must take when the tabs cannot all fit at CHIP_MIN_WIDTH:
+// the largest multiple of (chip + gap) that fits, so the row ends on a chip
+// boundary rather than mid-glyph; the remaining tabs scroll. `width: 0` means
+// "no snapping needed" — the chips simply share the row.
+export function stripFitWidth(available, tabCount) {
+  const room = Math.floor(available)
+  const count = Math.floor(tabCount)
+  if (!(room > 0) || !(count > 0)) return { width: 0, chipWidth: 0 }
+  const perRow = Math.max(1, Math.floor((room + CHIP_GAP) / (CHIP_MIN_WIDTH + CHIP_GAP)))
+  if (count <= perRow) return { width: 0, chipWidth: 0 }
+  return {
+    width: perRow * CHIP_MIN_WIDTH + (perRow - 1) * CHIP_GAP,
+    chipWidth: CHIP_MIN_WIDTH,
+  }
+}

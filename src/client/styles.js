@@ -22,7 +22,7 @@ const ITAB_CSS = [
   '.itab-tabbar{display:flex;align-items:center;gap:4px;min-width:0;max-width:70vw;-webkit-app-region:no-drag;app-region:no-drag}',
   /* min-width keeps room for two chips even if a measurement goes wrong: past
      that the strip scrolls with the wheel instead of squashing chips. */
-  '.itab-strip{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:min(196px,100%);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-app-region:no-drag;app-region:no-drag}',
+  '.itab-strip{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:min(128px,100%);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-app-region:no-drag;app-region:no-drag}',
   '.itab-strip::-webkit-scrollbar{display:none}',
   '.itab-strip[data-itab-fade-right="1"]:not([data-itab-fade-left="1"]){-webkit-mask-image:linear-gradient(to left,transparent,#000 16px);mask-image:linear-gradient(to left,transparent,#000 16px)}',
   '.itab-strip[data-itab-fade-left="1"]:not([data-itab-fade-right="1"]){-webkit-mask-image:linear-gradient(to right,transparent,#000 16px);mask-image:linear-gradient(to right,transparent,#000 16px)}',
@@ -31,7 +31,7 @@ const ITAB_CSS = [
      96px..--itab-tab-max. When every chip still fits at 96px nothing is cut
      off; when they do not, the strip scrolls with the wheel instead of
      shrinking chips below a readable width. */
-  '.itab-tab{display:flex;align-items:center;gap:6px;flex:0 0 auto;box-sizing:border-box;width:clamp(96px,calc(100% / var(--itab-count,1) - 4px),var(--itab-tab-max,240px));min-width:96px;max-width:var(--itab-tab-max,240px);padding:6px 6px 6px 10px;border-radius:8px;cursor:pointer;user-select:none;color:var(--dsw-alias-label-secondary,#b8b8b8);background:transparent;white-space:nowrap;transition:background .12s ease,color .12s ease}',
+  '.itab-tab{display:flex;align-items:center;gap:6px;flex:0 0 auto;box-sizing:border-box;width:var(--itab-chip-w,clamp(128px,calc(100% / var(--itab-count,1) - 4px),var(--itab-tab-max,240px)));min-width:128px;max-width:var(--itab-tab-max,240px);padding:6px 6px 6px 10px;border-radius:8px;cursor:pointer;user-select:none;color:var(--dsw-alias-label-secondary,#b8b8b8);background:transparent;white-space:nowrap;transition:background .12s ease,color .12s ease}',
   '.itab-tab:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.14));color:var(--dsw-alias-label-primary,#e6e6e6)}',
   '.itab-tab-active{color:var(--dsw-alias-label-primary,#e6e6e6)}',
   '.itab-tab-dragging{opacity:.45}',

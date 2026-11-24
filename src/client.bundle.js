@@ -389,6 +389,27 @@ function stripRoomFor(limitLeft, barLeft, headerWidth) {
   return Math.max(room, Math.min(STRIP_MIN_ROOM, available))
 }
 
+// Chips never get narrower than this: a row that cannot hold whole chips
+// scrolls instead of shaving the last one down to a single glyph.
+const CHIP_MIN_WIDTH = 128
+const CHIP_GAP = 4
+
+// Width the strip must take when the tabs cannot all fit at CHIP_MIN_WIDTH:
+// the largest multiple of (chip + gap) that fits, so the row ends on a chip
+// boundary rather than mid-glyph; the remaining tabs scroll. `width: 0` means
+// "no snapping needed" — the chips simply share the row.
+function stripFitWidth(available, tabCount) {
+  const room = Math.floor(available)
+  const count = Math.floor(tabCount)
+  if (!(room > 0) || !(count > 0)) return { width: 0, chipWidth: 0 }
+  const perRow = Math.max(1, Math.floor((room + CHIP_GAP) / (CHIP_MIN_WIDTH + CHIP_GAP)))
+  if (count <= perRow) return { width: 0, chipWidth: 0 }
+  return {
+    width: perRow * CHIP_MIN_WIDTH + (perRow - 1) * CHIP_GAP,
+    chipWidth: CHIP_MIN_WIDTH,
+  }
+}
+
 
 /* ==================== i18n.js ==================== */
 /* dsh-iTab — dictionaries. Data only, registered as the "itab" locale
@@ -581,7 +602,7 @@ const ITAB_CSS = [
   '.itab-tabbar{display:flex;align-items:center;gap:4px;min-width:0;max-width:70vw;-webkit-app-region:no-drag;app-region:no-drag}',
   /* min-width keeps room for two chips even if a measurement goes wrong: past
      that the strip scrolls with the wheel instead of squashing chips. */
-  '.itab-strip{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:min(196px,100%);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-app-region:no-drag;app-region:no-drag}',
+  '.itab-strip{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:min(128px,100%);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-app-region:no-drag;app-region:no-drag}',
   '.itab-strip::-webkit-scrollbar{display:none}',
   '.itab-strip[data-itab-fade-right="1"]:not([data-itab-fade-left="1"]){-webkit-mask-image:linear-gradient(to left,transparent,#000 16px);mask-image:linear-gradient(to left,transparent,#000 16px)}',
   '.itab-strip[data-itab-fade-left="1"]:not([data-itab-fade-right="1"]){-webkit-mask-image:linear-gradient(to right,transparent,#000 16px);mask-image:linear-gradient(to right,transparent,#000 16px)}',
@@ -590,7 +611,7 @@ const ITAB_CSS = [
      96px..--itab-tab-max. When every chip still fits at 96px nothing is cut
      off; when they do not, the strip scrolls with the wheel instead of
      shrinking chips below a readable width. */
-  '.itab-tab{display:flex;align-items:center;gap:6px;flex:0 0 auto;box-sizing:border-box;width:clamp(96px,calc(100% / var(--itab-count,1) - 4px),var(--itab-tab-max,240px));min-width:96px;max-width:var(--itab-tab-max,240px);padding:6px 6px 6px 10px;border-radius:8px;cursor:pointer;user-select:none;color:var(--dsw-alias-label-secondary,#b8b8b8);background:transparent;white-space:nowrap;transition:background .12s ease,color .12s ease}',
+  '.itab-tab{display:flex;align-items:center;gap:6px;flex:0 0 auto;box-sizing:border-box;width:var(--itab-chip-w,clamp(128px,calc(100% / var(--itab-count,1) - 4px),var(--itab-tab-max,240px)));min-width:128px;max-width:var(--itab-tab-max,240px);padding:6px 6px 6px 10px;border-radius:8px;cursor:pointer;user-select:none;color:var(--dsw-alias-label-secondary,#b8b8b8);background:transparent;white-space:nowrap;transition:background .12s ease,color .12s ease}',
   '.itab-tab:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.14));color:var(--dsw-alias-label-primary,#e6e6e6)}',
   '.itab-tab-active{color:var(--dsw-alias-label-primary,#e6e6e6)}',
   '.itab-tab-dragging{opacity:.45}',
@@ -1493,6 +1514,31 @@ function useStripOverflow(stripRef, deps) {
   return state
 }
 
+/** Snaps the strip to whole chips when not all tabs fit at CHIP_MIN_WIDTH, so
+ *  the row never ends mid-chip; the rest scrolls. Widths come from the model. */
+function useStripFit(stripRef, tabCount) {
+  const React = P.React
+  const [fit, setFit] = React.useState({ width: 0, chipWidth: 0 })
+  React.useLayoutEffect(() => {
+    const el = stripRef.current
+    if (!el) return undefined
+    const measure = () => {
+      const next = stripFitWidth(el.clientWidth, tabCount)
+      setFit((prev) => (prev.width === next.width && prev.chipWidth === next.chipWidth ? prev : next))
+    }
+    measure()
+    let observer = null
+    if (typeof ResizeObserver === 'function') {
+      observer = new ResizeObserver(measure)
+      observer.observe(el)
+    }
+    return () => {
+      if (observer) observer.disconnect()
+    }
+  }, [tabCount])
+  return fit
+}
+
 /** Scrolls the active chip into view (instant: the shell remounts the
  *  header during navigation, so smooth scrolling never finishes). */
 function useRevealActive(stripRef, sessionId, tabCount) {
@@ -2150,6 +2196,7 @@ function TabsStrip(props) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const [ctx, setCtx] = React.useState(null) // { x, y, id }
   const overflow = useStripOverflow(stripRef, [tabs.length, sessionId, enabled])
+  const fit = useStripFit(stripRef, tabs.length)
   const roomWidth = useStripFill(barRef, [tabs.length, sessionId, enabled])
   useRevealActive(stripRef, sessionId, tabs.length)
   useWheelScroll(stripRef)
@@ -2391,7 +2438,12 @@ function TabsStrip(props) {
       'data-itab-tabs': String(tabs.length),
       'data-itab-fade-left': overflow.canLeft ? '1' : '0',
       'data-itab-fade-right': overflow.canRight ? '1' : '0',
-      style: { '--itab-count': String(Math.max(1, tabs.length)) },
+      // Chips share the row at 1/n; when that would drop them under their
+      // minimum, the strip snaps to whole chips and the rest scrolls.
+      style: Object.assign(
+        { '--itab-count': String(Math.max(1, tabs.length)) },
+        fit.width > 0 ? { maxWidth: fit.width + 'px', '--itab-chip-w': fit.chipWidth + 'px' } : null,
+      ),
     },
       tabs.map((id) => {
         const active = sessionId === id

@@ -358,6 +358,7 @@ function TabsStrip(props) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const [ctx, setCtx] = React.useState(null) // { x, y, id }
   const overflow = useStripOverflow(stripRef, [tabs.length, sessionId, enabled])
+  const fit = useStripFit(stripRef, tabs.length)
   const roomWidth = useStripFill(barRef, [tabs.length, sessionId, enabled])
   useRevealActive(stripRef, sessionId, tabs.length)
   useWheelScroll(stripRef)
@@ -599,7 +600,12 @@ function TabsStrip(props) {
       'data-itab-tabs': String(tabs.length),
       'data-itab-fade-left': overflow.canLeft ? '1' : '0',
       'data-itab-fade-right': overflow.canRight ? '1' : '0',
-      style: { '--itab-count': String(Math.max(1, tabs.length)) },
+      // Chips share the row at 1/n; when that would drop them under their
+      // minimum, the strip snaps to whole chips and the rest scrolls.
+      style: Object.assign(
+        { '--itab-count': String(Math.max(1, tabs.length)) },
+        fit.width > 0 ? { maxWidth: fit.width + 'px', '--itab-chip-w': fit.chipWidth + 'px' } : null,
+      ),
     },
       tabs.map((id) => {
         const active = sessionId === id

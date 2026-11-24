@@ -22,6 +22,8 @@ import {
   subscribeTabs,
   stripFillWidth,
   stripRoomFor,
+  stripFitWidth,
+  CHIP_MIN_WIDTH,
   STORAGE_KEY,
   normalizeHistory,
   pushHistory,
@@ -218,6 +220,24 @@ test('stripRoomFor caps to the space before the shell controls', () => {
   assert.equal(stripRoomFor(240, 16, 1600), 224)
   // Degenerate measurement (controls left of the bar): no cap, never negative.
   assert.equal(stripRoomFor(300, 301, 679), 0)
+})
+
+test('stripFitWidth keeps whole chips: the row ends on a chip boundary', () => {
+  // The GUI's narrow pane: 392px of strip, four tabs. Four chips at the 128px
+  // minimum need 524px, so the strip snaps to three whole chips instead of
+  // shaving the fourth down to a single glyph.
+  assert.deepEqual(stripFitWidth(392, 4), { width: 3 * CHIP_MIN_WIDTH + 2 * 4, chipWidth: CHIP_MIN_WIDTH })
+  // Three tabs in the same row already fit: nothing to snap.
+  assert.deepEqual(stripFitWidth(392, 3), { width: 0, chipWidth: 0 })
+  // Plenty of room: chips share the row.
+  assert.deepEqual(stripFitWidth(700, 5), { width: 0, chipWidth: 0 })
+  // One tab too many for the row: five whole chips, the sixth scrolls.
+  assert.deepEqual(stripFitWidth(700, 6), { width: 5 * CHIP_MIN_WIDTH + 4 * 4, chipWidth: CHIP_MIN_WIDTH })
+  // Narrower than a single chip: keep one, scroll the rest.
+  assert.deepEqual(stripFitWidth(150, 2), { width: CHIP_MIN_WIDTH, chipWidth: CHIP_MIN_WIDTH })
+  // Degenerate measurements never snap.
+  assert.deepEqual(stripFitWidth(0, 3), { width: 0, chipWidth: 0 })
+  assert.deepEqual(stripFitWidth(392, 0), { width: 0, chipWidth: 0 })
 })
 
 test('DEFAULT_MAX_TABS is roomier than the reference cap', () => {
