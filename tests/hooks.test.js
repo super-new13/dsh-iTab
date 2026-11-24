@@ -51,7 +51,7 @@ function makeEnv() {
   const P = { React: makeReact() }
   const ctx = { P, localStorage: storage.stub }
   vm.createContext(ctx)
-  vm.runInContext(source + '\nthis.__useTabSync = useTabSync; this.__resetLastCurrent = () => { lastCurrentId = "" }', ctx)
+  vm.runInContext(source + '\nthis.__useTabSync = useTabSync; this.__resetLastCurrent = () => { lastCurrentId = ""; fallbackFrom = "" }', ctx)
   return { ctx, restore: () => { delete globalThis.localStorage } }
 }
 
@@ -112,4 +112,76 @@ test('useTabSync: a list that is not ready never prunes, even with an empty byId
   model.saveTabs(['a', 'b'], 'b')
   env.ctx.__useTabSync(snapshotWith('pending', {}, null), noWorkspaces, prefs)
   assert.deepEqual(model.tabsSnapshot(), ['a', 'b'])
+})
+
+test('useTabSync: deleting the on-screen session lands on the last surviving tab, not on the blank landing', (t) => {
+  const env = makeEnv()
+  t.after(env.restore)
+  env.ctx.__resetLastCurrent()
+  model.saveTabs(['a', 'b', 'c'], 'b')
+  env.ctx.__useTabSync(snapshotWith('ready', { a: false, b: false, c: false }, 'b'), noWorkspaces, prefs)
+  assert.equal(model.tabsActive(), 'b')
+  // b (on screen) is gone; the host moved to a fresh blank session 'new'
+  const opened = []
+  env.ctx.__useTabSync(snapshotWith('ready', { a: false, c: false, new: true }, 'new'), noWorkspaces, prefs, (id) => opened.push(id))
+  assert.deepEqual(model.tabsSnapshot(), ['a', 'c'], 'no chip is minted for the blind landing')
+  assert.equal(model.tabsActive(), 'c', 'active follows the fallback tab')
+  assert.deepEqual(opened, ['c'], 'the strip navigates to the last surviving tab')
+  assert.deepEqual(model.historySnapshot(), [], 'deletion is not a close: nothing to reopen')
+})
+
+test('useTabSync: the fallback redirect fires once, even if the store ticks before the host lands', (t) => {
+  const env = makeEnv()
+  t.after(env.restore)
+  env.ctx.__resetLastCurrent()
+  model.saveTabs(['a', 'b', 'c'], 'b')
+  env.ctx.__useTabSync(snapshotWith('ready', { a: false, b: false, c: false }, 'b'), noWorkspaces, prefs)
+  const landed = snapshotWith('ready', { a: false, c: false, new: true }, 'new')
+  const opened = []
+  const open = (id) => opened.push(id)
+  env.ctx.__useTabSync(landed, noWorkspaces, prefs, open)
+  env.ctx.__useTabSync(landed, noWorkspaces, prefs, open)
+  assert.deepEqual(opened, ['c'])
+  assert.deepEqual(model.tabsSnapshot(), ['a', 'c'])
+  assert.equal(model.tabsActive(), 'c')
+})
+
+test('useTabSync: once the fallback tab is on screen it stays put and nothing new opens', (t) => {
+  const env = makeEnv()
+  t.after(env.restore)
+  env.ctx.__resetLastCurrent()
+  model.saveTabs(['a', 'b', 'c'], 'b')
+  env.ctx.__useTabSync(snapshotWith('ready', { a: false, b: false, c: false }, 'b'), noWorkspaces, prefs)
+  // the host settled on c, which already owns a chip
+  const opened = []
+  env.ctx.__useTabSync(snapshotWith('ready', { a: false, c: false }, 'c'), noWorkspaces, prefs, (id) => opened.push(id))
+  assert.deepEqual(opened, [])
+  assert.deepEqual(model.tabsSnapshot(), ['a', 'c'])
+  assert.equal(model.tabsActive(), 'c')
+})
+
+test('useTabSync: deleting the on-screen session with nothing left keeps the blank landing chip', (t) => {
+  const env = makeEnv()
+  t.after(env.restore)
+  env.ctx.__resetLastCurrent()
+  model.saveTabs(['x'], 'x')
+  env.ctx.__useTabSync(snapshotWith('ready', { x: false }, 'x'), noWorkspaces, prefs)
+  const opened = []
+  env.ctx.__useTabSync(snapshotWith('ready', { fresh: true }, 'fresh'), noWorkspaces, prefs, (id) => opened.push(id))
+  assert.deepEqual(model.tabsSnapshot(), ['fresh'], 'an empty strip would be a dead end')
+  assert.equal(model.tabsActive(), 'fresh')
+  assert.deepEqual(opened, [])
+})
+
+test('useTabSync: deleting the on-screen session when the host lands nowhere still goes to the last tab', (t) => {
+  const env = makeEnv()
+  t.after(env.restore)
+  env.ctx.__resetLastCurrent()
+  model.saveTabs(['a', 'b', 'c'], 'b')
+  env.ctx.__useTabSync(snapshotWith('ready', { a: false, b: false, c: false }, 'b'), noWorkspaces, prefs)
+  const opened = []
+  env.ctx.__useTabSync(snapshotWith('ready', { a: false, c: false }, null), noWorkspaces, prefs, (id) => opened.push(id))
+  assert.deepEqual(model.tabsSnapshot(), ['a', 'c'])
+  assert.equal(model.tabsActive(), 'c')
+  assert.deepEqual(opened, ['c'])
 })

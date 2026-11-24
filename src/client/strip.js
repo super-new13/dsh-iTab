@@ -336,7 +336,7 @@ function TabsStrip(props) {
   })
 
   const sessions = typeof useSessions === 'function' ? useSessions((s) => s) : null
-  useTabSync(sessions, useWorkspaces, prefs)
+  useTabSync(sessions, useWorkspaces, prefs, open)
   const statuses = typeof useSessionStatus === 'function' ? useSessionStatus((s) => s) : null
   // The workspace listing feeds the chip bubbles' project segment: the entry
   // owning a session names the project (last title segment) and supplies the
