@@ -27,9 +27,11 @@ const ITAB_CSS = [
   '.itab-strip[data-itab-fade-right="1"]:not([data-itab-fade-left="1"]){-webkit-mask-image:linear-gradient(to left,transparent,#000 16px);mask-image:linear-gradient(to left,transparent,#000 16px)}',
   '.itab-strip[data-itab-fade-left="1"]:not([data-itab-fade-right="1"]){-webkit-mask-image:linear-gradient(to right,transparent,#000 16px);mask-image:linear-gradient(to right,transparent,#000 16px)}',
   '.itab-strip[data-itab-fade-left="1"][data-itab-fade-right="1"]{-webkit-mask-image:linear-gradient(to right,transparent,#000 16px,#000 calc(100% - 16px),transparent);mask-image:linear-gradient(to right,transparent,#000 16px,#000 calc(100% - 16px),transparent)}',
-  /* Roomier than the reference: chips eagerly share the row (flex 1 1
-     auto up to --itab-tab-max) instead of hugging their content. */
-  '.itab-tab{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:96px;max-width:var(--itab-tab-max,240px);padding:6px 6px 6px 10px;border-radius:8px;cursor:pointer;user-select:none;color:var(--dsw-alias-label-secondary,#b8b8b8);background:transparent;white-space:nowrap;transition:background .12s ease,color .12s ease}',
+  /* Chips share the row exactly: (strip width / count) - gap, clamped to
+     96px..--itab-tab-max. When every chip still fits at 96px nothing is cut
+     off; when they do not, the strip scrolls with the wheel instead of
+     shrinking chips below a readable width. */
+  '.itab-tab{display:flex;align-items:center;gap:6px;flex:0 0 auto;box-sizing:border-box;width:clamp(96px,calc(100% / var(--itab-count,1) - 4px),var(--itab-tab-max,240px));min-width:96px;max-width:var(--itab-tab-max,240px);padding:6px 6px 6px 10px;border-radius:8px;cursor:pointer;user-select:none;color:var(--dsw-alias-label-secondary,#b8b8b8);background:transparent;white-space:nowrap;transition:background .12s ease,color .12s ease}',
   '.itab-tab:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.14));color:var(--dsw-alias-label-primary,#e6e6e6)}',
   '.itab-tab-active{color:var(--dsw-alias-label-primary,#e6e6e6)}',
   '.itab-tab-dragging{opacity:.45}',

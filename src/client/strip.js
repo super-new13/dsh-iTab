@@ -599,6 +599,7 @@ function TabsStrip(props) {
       'data-itab-tabs': String(tabs.length),
       'data-itab-fade-left': overflow.canLeft ? '1' : '0',
       'data-itab-fade-right': overflow.canRight ? '1' : '0',
+      style: { '--itab-count': String(Math.max(1, tabs.length)) },
     },
       tabs.map((id) => {
         const active = sessionId === id
