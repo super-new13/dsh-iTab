@@ -1,5 +1,7 @@
 # dsh-iTab — DSH 浏览器式会话标签页
 
+[![在 dsh-plugin.org 上收录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/super-new13/dsh-itab)
+
 > Browser-style session tabs for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH)：更宽敞的标签条、完整的右键菜单、关闭历史、悬停气泡（含 Git 分支）、一键用 VS Code / 系统文件管理器打开项目。
 
 为 DSH（DeepSeek Harness）带来浏览器级的会话标签页体验。
