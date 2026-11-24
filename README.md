@@ -95,10 +95,16 @@ Git 分支由宿主侧路由 `POST /dsh-itab/git-branch` 实时读取（`git sym
 将下方的 `web` 换成你实际使用的 DSH Web Profile 名称，然后重启该 Profile 对应的 Web 服务。
 
 ```sh
+dsh plugin --profile web add dsh-itab
+```
+
+已发布到 npm（[dsh-itab](https://www.npmjs.com/package/dsh-itab)），一条命令即可安装。想锁定具体版本时，可以改用标签或 Git 提交：
+
+```sh
 dsh plugin --profile web add 'github:super-new13/dsh-iTab#v0.3.10'
 ```
 
-已在 macOS 上用 DSH `0.2.2-rc.3`、Node `24.21.0` 和 pnpm `10.16.1` 通过独立 Profile 验证安装，`--dump-config` 可看到 `dsh-itab` 配置层。此次验证覆盖 CLI 安装和配置加载，未覆盖 Windows 实机和 Web 界面操作。
+已在 macOS 上用 DSH `0.2.2-rc.3`、Node `24.21.0` 和 pnpm `10.16.1` 通过独立 Profile 验证安装，`--dump-config` 可看到 `dsh-itab` 配置层。npm 与标签两种方式都验证过，装出来均为 0.3.10。此次验证覆盖 CLI 安装和配置加载，未覆盖 Windows 实机和 Web 界面操作。
 
 ### 依赖
 
